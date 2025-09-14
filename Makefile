@@ -8,6 +8,8 @@ format:
 	clang-format -i src/*.c
 	clang-format -i src/include/*.h
 	clang-format -i test/*.c
+	clang-format -i v3/*.c
+	clang-format -i v3/include/*.h
 dev:
 	$(CC) -std=gnu99 -fPIC -shared -ggdb -O0 -fno-omit-frame-pointer -z norelro -z execstack -Wno-gnu-zero-variadic-macro-arguments -fno-stack-protector -Wall -Wextra -pedantic -Wconversion -Wno-newline-eof -o libk2v.so src/k2v.c
 	$(CC) -std=gnu99 -ggdb -O0 -fno-omit-frame-pointer -Wno-gnu-zero-variadic-macro-arguments -fno-stack-protector -Wall -Wextra -pedantic -Wconversion -Wno-newline-eof -c -o libk2v.o src/k2v.c
