@@ -198,150 +198,157 @@ void k2v_free(k2v_buf_t _Nonnull kv)
 	}
 	free(kv);
 }
-ssize_t k2v_get_key_value(const char *_Nonnull key, k2v_buf_t _Nonnull kv,
-                          void *_Nonnull value, k2v_value_type_t type)
+ssize_t k2v_get_key_value(const char *_Nonnull key, k2v_buf_t _Nonnull kv, void *_Nonnull value, k2v_value_type_t type)
 {
-    if (kv == NULL) {
-        k2v_warning("kv buffer is NULL when searching key '%s'\n", key);
-        return -1;
-    }
+	/*
+	 * Get the key-value pair from the buffer.
+	 * The key-value pair will be stored in the value.
+	 * The type will be used to determine the type of the value.
+	 * Return 0 or the length of the value.
+	 * Return -1 if the key is not found.
+	 */
 
-    for (int i = 0; kv[i] != NULL; i++) {
-        if (strcmp(kv[i]->key, key) == 0) {
-            if (kv[i]->data.scalar == NULL && kv[i]->type == K2V_DATA_TYPE_SCALAR) {
-                k2v_warning("key '%s' has NULL scalar value\n", key);
-                return -1;
-            }
+	if (kv == NULL) {
+		k2v_warning("kv buffer is NULL when searching key '%s'\n", key);
+		return -1;
+	}
 
-            switch (type) {
-            case K2V_TYPE_CHAR:
-                if (kv[i]->type != K2V_DATA_TYPE_SCALAR) {
-                    k2v_warning("key '%s' expected SCALAR but got ARRAY\n", key);
-                    return -1;
-                }
-                *(char **)value = kv[i]->data.scalar;
-                return 0;
+	for (int i = 0; kv[i] != NULL; i++) {
+		if (strcmp(kv[i]->key, key) == 0) {
+			if (kv[i]->data.scalar == NULL && kv[i]->type == K2V_DATA_TYPE_SCALAR) {
+				k2v_warning("key '%s' has NULL scalar value\n", key);
+				return -1;
+			}
 
-            case K2V_TYPE_INT:
-                if (kv[i]->type != K2V_DATA_TYPE_SCALAR) {
-                    k2v_warning("key '%s' expected SCALAR but got ARRAY\n", key);
-                    return -1;
-                }
-                *(int *)value = kv[i]->data.scalar ? atoi(kv[i]->data.scalar) : 0;
-                return 0;
+			switch (type) {
+			case K2V_TYPE_CHAR:
+				if (kv[i]->type != K2V_DATA_TYPE_SCALAR) {
+					k2v_warning("key '%s' expected SCALAR but got ARRAY\n", key);
+					return -1;
+				}
+				*(char **)value = kv[i]->data.scalar;
+				return 0;
 
-            case K2V_TYPE_BOOL:
-                if (kv[i]->type != K2V_DATA_TYPE_SCALAR) {
-                    k2v_warning("key '%s' expected SCALAR but got ARRAY\n", key);
-                    return -1;
-                }
-                if (strcasecmp(kv[i]->data.scalar, "true") == 0) {
-                    *(bool *)value = true;
-                } else if (strcasecmp(kv[i]->data.scalar, "false") == 0) {
-                    *(bool *)value = false;
-                } else {
-                    k2v_warning("key '%s' has invalid BOOL value '%s'\n", key, kv[i]->data.scalar);
-                    return -1;
-                }
-                return 0;
+			case K2V_TYPE_INT:
+				if (kv[i]->type != K2V_DATA_TYPE_SCALAR) {
+					k2v_warning("key '%s' expected SCALAR but got ARRAY\n", key);
+					return -1;
+				}
+				*(int *)value = kv[i]->data.scalar ? atoi(kv[i]->data.scalar) : 0;
+				return 0;
 
-            case K2V_TYPE_FLOAT:
-                if (kv[i]->type != K2V_DATA_TYPE_SCALAR) {
-                    k2v_warning("key '%s' expected SCALAR but got ARRAY\n", key);
-                    return -1;
-                }
-                *(float *)value = atof(kv[i]->data.scalar);
-                return 0;
+			case K2V_TYPE_BOOL:
+				if (kv[i]->type != K2V_DATA_TYPE_SCALAR) {
+					k2v_warning("key '%s' expected SCALAR but got ARRAY\n", key);
+					return -1;
+				}
+				if (strcasecmp(kv[i]->data.scalar, "true") == 0) {
+					*(bool *)value = true;
+				} else if (strcasecmp(kv[i]->data.scalar, "false") == 0) {
+					*(bool *)value = false;
+				} else {
+					k2v_warning("key '%s' has invalid BOOL value '%s'\n", key, kv[i]->data.scalar);
+					return -1;
+				}
+				return 0;
 
-            case K2V_TYPE_LONG:
-                if (kv[i]->type != K2V_DATA_TYPE_SCALAR) {
-                    k2v_warning("key '%s' expected SCALAR but got ARRAY\n", key);
-                    return -1;
-                }
-                *(long *)value = atol(kv[i]->data.scalar);
-                return 0;
+			case K2V_TYPE_FLOAT:
+				if (kv[i]->type != K2V_DATA_TYPE_SCALAR) {
+					k2v_warning("key '%s' expected SCALAR but got ARRAY\n", key);
+					return -1;
+				}
+				*(float *)value = atof(kv[i]->data.scalar);
+				return 0;
 
-            case K2V_TYPE_CHAR_ARRAY:
-            case K2V_TYPE_INT_ARRAY:
-            case K2V_TYPE_FLOAT_ARRAY:
-            case K2V_TYPE_LONG_ARRAY: {
-                if (kv[i]->type != K2V_DATA_TYPE_ARRAY) {
-                    k2v_warning("key '%s' expected ARRAY but got SCALAR\n", key);
-                    return -1;
-                }
-                size_t len = 0;
-                for (size_t j = 0; ((char **)kv[i]->data.array)[j] != NULL; j++) {
-                    len++;
-                }
+			case K2V_TYPE_LONG:
+				if (kv[i]->type != K2V_DATA_TYPE_SCALAR) {
+					k2v_warning("key '%s' expected SCALAR but got ARRAY\n", key);
+					return -1;
+				}
+				*(long *)value = atol(kv[i]->data.scalar);
+				return 0;
 
-                if (len == 0) {
-                    k2v_warning("key '%s' array is empty\n", key);
-                    return 0;
-                }
+			case K2V_TYPE_CHAR_ARRAY:
+			case K2V_TYPE_INT_ARRAY:
+			case K2V_TYPE_FLOAT_ARRAY:
+			case K2V_TYPE_LONG_ARRAY: {
+				if (kv[i]->type != K2V_DATA_TYPE_ARRAY) {
+					k2v_warning("key '%s' expected ARRAY but got SCALAR\n", key);
+					return -1;
+				}
+				size_t len = 0;
+				for (size_t j = 0; ((char **)kv[i]->data.array)[j] != NULL; j++) {
+					len++;
+				}
 
-                switch (type) {
-                case K2V_TYPE_CHAR_ARRAY: {
-                    char **arr = malloc(sizeof(char *) * (len + 1));
-                    if (!arr) {
-                        k2v_warning("malloc failed for key '%s'\n", key);
-                        return -1;
-                    }
-                    for (size_t j = 0; j < len; j++) {
-                        arr[j] = strdup(((char **)kv[i]->data.array)[j]);
-                    }
-                    arr[len] = NULL;
-                    *(char ***)value = arr;
-                    return (ssize_t)len;
-                }
-                case K2V_TYPE_INT_ARRAY: {
-                    int *arr = malloc(sizeof(int) * len);
-                    if (!arr) {
-                        k2v_warning("malloc failed for key '%s'\n", key);
-                        return -1;
-                    }
-                    for (size_t j = 0; j < len; j++) {
-                        arr[j] = atoi(((char **)kv[i]->data.array)[j]);
-                    }
-                    *(int **)value = arr;
-                    return (ssize_t)len;
-                }
-                case K2V_TYPE_FLOAT_ARRAY: {
-                    float *arr = malloc(sizeof(float) * len);
-                    if (!arr) {
-                        k2v_warning("malloc failed for key '%s'\n", key);
-                        return -1;
-                    }
-                    for (size_t j = 0; j < len; j++) {
-                        arr[j] = atof(((char **)kv[i]->data.array)[j]);
-                    }
-                    *(float **)value = arr;
-                    return (ssize_t)len;
-                }
-                case K2V_TYPE_LONG_ARRAY: {
-                    long *arr = malloc(sizeof(long) * len);
-                    if (!arr) {
-                        k2v_warning("malloc failed for key '%s'\n", key);
-                        return -1;
-                    }
-                    for (size_t j = 0; j < len; j++) {
-                        arr[j] = atol(((char **)kv[i]->data.array)[j]);
-                    }
-                    *(long **)value = arr;
-                    return (ssize_t)len;
-                }
-                default:
-                    break;
-                }
-            }
-            default:
-                k2v_warning("unsupported type %d requested for key '%s'\n", type, key);
-                return -1;
-            }
-        }
-    }
+				if (len == 0) {
+					k2v_warning("key '%s' array is empty\n", key);
+					return 0;
+				}
 
-    k2v_warning("key '%s' not found\n", key);
-    return -1;
+				switch (type) {
+				case K2V_TYPE_CHAR_ARRAY: {
+					char **arr = malloc(sizeof(char *) * (len + 1));
+					if (!arr) {
+						k2v_warning("malloc failed for key '%s'\n", key);
+						return -1;
+					}
+					for (size_t j = 0; j < len; j++) {
+						arr[j] = strdup(((char **)kv[i]->data.array)[j]);
+					}
+					arr[len] = NULL;
+					*(char ***)value = arr;
+					return (ssize_t)len;
+				}
+				case K2V_TYPE_INT_ARRAY: {
+					int *arr = malloc(sizeof(int) * len);
+					if (!arr) {
+						k2v_warning("malloc failed for key '%s'\n", key);
+						return -1;
+					}
+					for (size_t j = 0; j < len; j++) {
+						arr[j] = atoi(((char **)kv[i]->data.array)[j]);
+					}
+					*(int **)value = arr;
+					return (ssize_t)len;
+				}
+				case K2V_TYPE_FLOAT_ARRAY: {
+					float *arr = malloc(sizeof(float) * len);
+					if (!arr) {
+						k2v_warning("malloc failed for key '%s'\n", key);
+						return -1;
+					}
+					for (size_t j = 0; j < len; j++) {
+						arr[j] = atof(((char **)kv[i]->data.array)[j]);
+					}
+					*(float **)value = arr;
+					return (ssize_t)len;
+				}
+				case K2V_TYPE_LONG_ARRAY: {
+					long *arr = malloc(sizeof(long) * len);
+					if (!arr) {
+						k2v_warning("malloc failed for key '%s'\n", key);
+						return -1;
+					}
+					for (size_t j = 0; j < len; j++) {
+						arr[j] = atol(((char **)kv[i]->data.array)[j]);
+					}
+					*(long **)value = arr;
+					return (ssize_t)len;
+				}
+				default:
+					break;
+				}
+			}
+			default:
+				k2v_warning("unsupported type %d requested for key '%s'\n", type, key);
+				return -1;
+			}
+		}
+	}
+
+	k2v_warning("key '%s' not found\n", key);
+	return -1;
 }
 k2v_buf_t k2v_open_file(const char *_Nonnull path)
 {
