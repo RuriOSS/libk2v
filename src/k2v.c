@@ -190,10 +190,11 @@ char *char_to_k2v(const char *_Nonnull key, const char *_Nonnull val)
 	size_t key_len = strlen(key);
 	size_t val_len = val ? strlen(val) : 0;
 	size_t total_size = key_len + val_len + 5; // ="\"\n\0"
-	
+
 	char *ret = malloc(total_size);
-	if (!ret) return NULL;
-	
+	if (!ret)
+		return NULL;
+
 	if (val != NULL) {
 		snprintf(ret, total_size, "%s=\"%s\"\n", key, val);
 	} else {
@@ -252,37 +253,40 @@ char *char_array_to_k2v(const char *_Nonnull key, char *const *_Nonnull val, int
 	if (key == NULL) {
 		return NULL;
 	}
-	
+
 	if (len == 0 || val == NULL) {
 		size_t size = strlen(key) + 5; // =[]\n\0
 		char *ret = malloc(size);
-		if (ret) snprintf(ret, size, "%s=[]\n", key);
+		if (ret)
+			snprintf(ret, size, "%s=[]\n", key);
 		return ret;
 	}
-	
+
 	size_t total_size = strlen(key) + 5; // key + =[\n + \0
 	for (int i = 0; i < len; i++) {
 		total_size += strlen(val[i]) + 2; // ""
-		if (i != len - 1) total_size += 1; // ,
+		if (i != len - 1)
+			total_size += 1; // ,
 	}
-	
+
 	char *buf = malloc(total_size);
-	if (!buf) return NULL;
-	
+	if (!buf)
+		return NULL;
+
 	char *ptr = buf;
 	ptr += sprintf(ptr, "%s=[", key);
-	
+
 	for (int i = 0; i < len; i++) {
 		ptr += sprintf(ptr, "\"%s\"", val[i]);
 		if (i != len - 1) {
 			*ptr++ = ',';
 		}
 	}
-	
+
 	*ptr++ = ']';
 	*ptr++ = '\n';
 	*ptr = '\0';
-	
+
 	return buf;
 }
 char *int_array_to_k2v(const char *_Nonnull key, int *_Nonnull val, int len)
@@ -293,26 +297,29 @@ char *int_array_to_k2v(const char *_Nonnull key, int *_Nonnull val, int len)
 	if (len == 0 || val == NULL) {
 		size_t size = strlen(key) + 5;
 		char *ret = malloc(size);
-		if (ret) snprintf(ret, size, "%s=[]\n", key);
+		if (ret)
+			snprintf(ret, size, "%s=[]\n", key);
 		return ret;
 	}
-	
+
 	size_t max_size = strlen(key) + len * 32 + 5; // 32 per int + padding
 	char *buf = malloc(max_size);
-	if (!buf) return NULL;
-	
+	if (!buf)
+		return NULL;
+
 	char *ptr = buf;
 	ptr += sprintf(ptr, "%s=[", key);
-	
+
 	for (int i = 0; i < len; i++) {
 		ptr += sprintf(ptr, "\"%d\"", val[i]);
-		if (i != len - 1) *ptr++ = ',';
+		if (i != len - 1)
+			*ptr++ = ',';
 	}
-	
+
 	*ptr++ = ']';
 	*ptr++ = '\n';
 	*ptr = '\0';
-	
+
 	return buf;
 }
 char *float_array_to_k2v(const char *_Nonnull key, float *_Nonnull val, int len)
@@ -323,26 +330,29 @@ char *float_array_to_k2v(const char *_Nonnull key, float *_Nonnull val, int len)
 	if (len == 0 || val == NULL) {
 		size_t size = strlen(key) + 5;
 		char *ret = malloc(size);
-		if (ret) snprintf(ret, size, "%s=[]\n", key);
+		if (ret)
+			snprintf(ret, size, "%s=[]\n", key);
 		return ret;
 	}
-	
+
 	size_t max_size = strlen(key) + len * 64 + 5; // 64 per float + padding
 	char *buf = malloc(max_size);
-	if (!buf) return NULL;
-	
+	if (!buf)
+		return NULL;
+
 	char *ptr = buf;
 	ptr += sprintf(ptr, "%s=[", key);
-	
+
 	for (int i = 0; i < len; i++) {
 		ptr += sprintf(ptr, "\"%f\"", (double)val[i]);
-		if (i != len - 1) *ptr++ = ',';
+		if (i != len - 1)
+			*ptr++ = ',';
 	}
-	
+
 	*ptr++ = ']';
 	*ptr++ = '\n';
 	*ptr = '\0';
-	
+
 	return buf;
 }
 char *k2v_add_comment(char *_Nonnull buf, char *_Nonnull comment)
@@ -350,10 +360,11 @@ char *k2v_add_comment(char *_Nonnull buf, char *_Nonnull comment)
 	size_t buf_len = (buf != NULL) ? strlen(buf) : 0;
 	size_t comment_len = strlen(comment);
 	size_t total_size = buf_len + comment_len + 5; // "# " + "\n" + '\0'
-	
+
 	char *ret = malloc(total_size);
-	if (!ret) return NULL;
-	
+	if (!ret)
+		return NULL;
+
 	if (buf != NULL) {
 		snprintf(ret, total_size, "%s# %s\n", buf, comment);
 	} else {
@@ -366,10 +377,11 @@ char *k2v_add_newline(char *_Nonnull buf)
 {
 	size_t buf_len = (buf != NULL) ? strlen(buf) : 0;
 	size_t total_size = buf_len + 2; // "\n" + '\0'
-	
+
 	char *ret = malloc(total_size);
-	if (!ret) return NULL;
-	
+	if (!ret)
+		return NULL;
+
 	if (buf != NULL) {
 		snprintf(ret, total_size, "%s\n", buf);
 	} else {
@@ -413,20 +425,21 @@ static char *remove_comment(const char *_Nonnull buf)
 	}
 	size_t len = strlen(buf);
 	char *ret = malloc(len + 1);
-	if (!ret) return NULL;
-	
+	if (!ret)
+		return NULL;
+
 	char *ret_ptr = ret;
 	const char *p = buf;
-	
+
 	while (p != NULL && *p != '\0') {
 		const char *next = strchr(p, '\n');
 		size_t line_len = next ? (size_t)(next - p) : strlen(p);
-		
+
 		char *line = malloc(line_len + 1);
 		if (line) {
 			memcpy(line, p, line_len);
 			line[line_len] = '\0';
-			
+
 			if (!is_coment_line(line)) {
 				if (ret_ptr != ret) {
 					*ret_ptr++ = '\n';
@@ -436,11 +449,11 @@ static char *remove_comment(const char *_Nonnull buf)
 			}
 			free(line);
 		}
-		
+
 		p = next ? next + 1 : NULL;
 	}
 	*ret_ptr = '\0';
-	
+
 	char *final_ret = NULL;
 	if (ret_ptr != ret) {
 		final_ret = strdup(ret);
@@ -1023,6 +1036,7 @@ int key_get_int(const char *_Nonnull key, const char *_Nonnull buf)
 	char *buf_to_read = k2v_auto_tidy(buf);
 	char *line = key_get_line(key, buf_to_read);
 	if (line == NULL) {
+		free(buf_to_read);
 		return 0;
 	}
 	char *tmp = line_get_right(line);
@@ -1047,6 +1061,7 @@ long long key_get_long(const char *_Nonnull key, const char *_Nonnull buf)
 	char *buf_to_read = k2v_auto_tidy(buf);
 	char *line = key_get_line(key, buf_to_read);
 	if (line == NULL) {
+		free(buf_to_read);
 		return 0;
 	}
 	char *tmp = line_get_right(line);
@@ -1071,6 +1086,7 @@ float key_get_float(const char *_Nonnull key, const char *_Nonnull buf)
 	char *buf_to_read = k2v_auto_tidy(buf);
 	char *line = key_get_line(key, buf_to_read);
 	if (line == NULL) {
+		free(buf_to_read);
 		return 0;
 	}
 	char *tmp = line_get_right(line);
@@ -1095,6 +1111,7 @@ bool key_get_bool(const char *_Nonnull key, const char *_Nonnull buf)
 	char *buf_to_read = k2v_auto_tidy(buf);
 	char *line = key_get_line(key, buf_to_read);
 	if (line == NULL) {
+		free(buf_to_read);
 		return false;
 	}
 	char *tmp = line_get_right(line);
@@ -1276,6 +1293,7 @@ int key_get_char_array(const char *_Nonnull key, const char *_Nonnull buf, char 
 	int ret = 0;
 	char *line = key_get_line(key, buf_to_read);
 	if (line == NULL) {
+		free(buf_to_read);
 		array[0] = 0;
 		return 0;
 	}
