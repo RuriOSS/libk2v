@@ -4,4 +4,5 @@ libk2v.a
 libk2v.so
 k2sh
 .vscode
+test/test_all
 1.c

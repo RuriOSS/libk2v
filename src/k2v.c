@@ -104,17 +104,19 @@ static char *get_current_line(const char *_Nonnull buf)
 	/*
 	 * Warning: free() after use.
 	 */
-	// NULL check.
 	if (buf == NULL) {
 		return NULL;
 	}
-	char *ret = strdup(buf);
-	if (strchr(ret, '\n') == NULL) {
-		return ret;
+	const char *newline = strchr(buf, '\n');
+	if (newline == NULL) {
+		return strdup(buf);
 	}
-	*strchr(ret, '\n') = '\0';
-	// ret will be larger than the line we got.
-	// But never mind, '\0' is the end of string.
+	size_t len = newline - buf;
+	char *ret = malloc(len + 1);
+	if (ret) {
+		memcpy(ret, buf, len);
+		ret[len] = '\0';
+	}
 	return ret;
 }
 // Goto next line.
@@ -123,21 +125,11 @@ static char *goto_next_line(const char *_Nonnull buf)
 	/*
 	 * Warning: do not free() it.
 	 */
-	// NULL check.
-	if (buf == NULL) {
-		return NULL;
-	}
-	if (strlen(buf) == 0) {
+	if (buf == NULL || *buf == '\0') {
 		return NULL;
 	}
 	char *ret = strchr(buf, '\n');
-	if (ret == NULL) {
-		return NULL;
-	}
-	if (strlen(ret) < 2) {
-		return NULL;
-	}
-	if (ret[1] == '\0') {
+	if (ret == NULL || ret[1] == '\0') {
 		return NULL;
 	}
 	// Skip '\n'.
@@ -192,38 +184,45 @@ char *k2v_open_file(const char *_Nonnull path, size_t bufsize)
 }
 char *char_to_k2v(const char *_Nonnull key, const char *_Nonnull val)
 {
-	// NULL check.
 	if (key == NULL) {
 		return NULL;
 	}
-	char *ret = NULL;
+	size_t key_len = strlen(key);
+	size_t val_len = val ? strlen(val) : 0;
+	size_t total_size = key_len + val_len + 5; // ="\"\n\0"
+	
+	char *ret = malloc(total_size);
+	if (!ret) return NULL;
+	
 	if (val != NULL) {
-		ret = malloc(strlen(key) + strlen(val) + 8);
-		sprintf(ret, "%s=\"%s\"\n", key, val);
+		snprintf(ret, total_size, "%s=\"%s\"\n", key, val);
 	} else {
-		ret = malloc(strlen(key) + 8);
-		sprintf(ret, "%s=\"\"\n", key);
+		snprintf(ret, total_size, "%s=\"\"\n", key);
 	}
 	return ret;
 }
 char *int_to_k2v(const char *_Nonnull key, int val)
 {
-	// NULL check.
 	if (key == NULL) {
 		return NULL;
 	}
-	char *ret = malloc(strlen(key) + 18 + 8);
-	sprintf(ret, "%s=\"%d\"\n", key, val);
+	size_t max_len = strlen(key) + 32; // Safe upper bound for integer
+	char *ret = malloc(max_len);
+	if (ret) {
+		snprintf(ret, max_len, "%s=\"%d\"\n", key, val);
+	}
 	return ret;
 }
 char *long_to_k2v(const char *_Nonnull key, long val)
 {
-	// NULL check.
 	if (key == NULL) {
 		return NULL;
 	}
-	char *ret = malloc(strlen(key) + 18 + 8 + 114);
-	sprintf(ret, "%s=\"%ld\"\n", key, val);
+	size_t max_len = strlen(key) + 64; // Safe upper bound for long
+	char *ret = malloc(max_len);
+	if (ret) {
+		snprintf(ret, max_len, "%s=\"%ld\"\n", key, val);
+	}
 	return ret;
 }
 char *bool_to_k2v(const char *_Nonnull key, bool val)
@@ -250,136 +249,133 @@ char *float_to_k2v(const char *_Nonnull key, float val)
 }
 char *char_array_to_k2v(const char *_Nonnull key, char *const *_Nonnull val, int len)
 {
-	// NULL check.
 	if (key == NULL) {
 		return NULL;
 	}
-	char *buf = malloc(strlen(key) + 8);
-	if (len == 0) {
-		sprintf(buf, "%s=[]\n", key);
-		char *ret = strdup(buf);
-		free(buf);
+	
+	if (len == 0 || val == NULL) {
+		size_t size = strlen(key) + 5; // =[]\n\0
+		char *ret = malloc(size);
+		if (ret) snprintf(ret, size, "%s=[]\n", key);
 		return ret;
 	}
-	size_t size = strlen(key) + 8;
-	sprintf(buf, "%s=[", key);
-	char *tmp = NULL;
+	
+	size_t total_size = strlen(key) + 5; // key + =[\n + \0
 	for (int i = 0; i < len; i++) {
-		tmp = malloc(strlen(val[i]) + 8);
-		sprintf(tmp, "\"%s\"", val[i]);
-		size += strlen(val[i]) + 8;
-		buf = realloc(buf, size);
-		strcat(buf, tmp);
-		if (i != len - 1) {
-			strcat(buf, ",");
-		} else {
-			strcat(buf, "]");
-		}
-		free(tmp);
+		total_size += strlen(val[i]) + 2; // ""
+		if (i != len - 1) total_size += 1; // ,
 	}
-	strcat(buf, "\n");
-	char *ret = strdup(buf);
-	free(buf);
-	return ret;
+	
+	char *buf = malloc(total_size);
+	if (!buf) return NULL;
+	
+	char *ptr = buf;
+	ptr += sprintf(ptr, "%s=[", key);
+	
+	for (int i = 0; i < len; i++) {
+		ptr += sprintf(ptr, "\"%s\"", val[i]);
+		if (i != len - 1) {
+			*ptr++ = ',';
+		}
+	}
+	
+	*ptr++ = ']';
+	*ptr++ = '\n';
+	*ptr = '\0';
+	
+	return buf;
 }
 char *int_array_to_k2v(const char *_Nonnull key, int *_Nonnull val, int len)
 {
-	// NULL check.
 	if (key == NULL) {
 		return NULL;
 	}
-	char *buf = malloc(strlen(key) + 18 * ((size_t)len + 8));
-	if (len == 0) {
-		sprintf(buf, "%s=[]\n", key);
-		char *ret = strdup(buf);
-		free(buf);
+	if (len == 0 || val == NULL) {
+		size_t size = strlen(key) + 5;
+		char *ret = malloc(size);
+		if (ret) snprintf(ret, size, "%s=[]\n", key);
 		return ret;
 	}
-	sprintf(buf, "%s=[", key);
-	char *tmp = malloc(18);
+	
+	size_t max_size = strlen(key) + len * 32 + 5; // 32 per int + padding
+	char *buf = malloc(max_size);
+	if (!buf) return NULL;
+	
+	char *ptr = buf;
+	ptr += sprintf(ptr, "%s=[", key);
+	
 	for (int i = 0; i < len; i++) {
-		sprintf(tmp, "\"%d\"", val[i]);
-		strcat(buf, tmp);
-		if (i != len - 1) {
-			strcat(buf, ",");
-		} else {
-			strcat(buf, "]");
-		}
+		ptr += sprintf(ptr, "\"%d\"", val[i]);
+		if (i != len - 1) *ptr++ = ',';
 	}
-	strcat(buf, "\n");
-	char *ret = strdup(buf);
-	free(buf);
-	free(tmp);
-	return ret;
+	
+	*ptr++ = ']';
+	*ptr++ = '\n';
+	*ptr = '\0';
+	
+	return buf;
 }
 char *float_array_to_k2v(const char *_Nonnull key, float *_Nonnull val, int len)
 {
-	// NULL check.
 	if (key == NULL) {
 		return NULL;
 	}
-	char *buf = malloc(strlen(key) + 400 * (size_t)len + 8);
-	if (len == 0) {
-		sprintf(buf, "%s=[]\n", key);
-		char *ret = strdup(buf);
-		free(buf);
+	if (len == 0 || val == NULL) {
+		size_t size = strlen(key) + 5;
+		char *ret = malloc(size);
+		if (ret) snprintf(ret, size, "%s=[]\n", key);
 		return ret;
 	}
-	sprintf(buf, "%s=[", key);
-	char *tmp = malloc(400);
+	
+	size_t max_size = strlen(key) + len * 64 + 5; // 64 per float + padding
+	char *buf = malloc(max_size);
+	if (!buf) return NULL;
+	
+	char *ptr = buf;
+	ptr += sprintf(ptr, "%s=[", key);
+	
 	for (int i = 0; i < len; i++) {
-		sprintf(tmp, "\"%f\"", val[i]);
-		strcat(buf, tmp);
-		if (i != len - 1) {
-			strcat(buf, ",");
-		} else {
-			strcat(buf, "]");
-		}
+		ptr += sprintf(ptr, "\"%f\"", (double)val[i]);
+		if (i != len - 1) *ptr++ = ',';
 	}
-	strcat(buf, "\n");
-	char *ret = strdup(buf);
-	free(buf);
-	free(tmp);
-	return ret;
+	
+	*ptr++ = ']';
+	*ptr++ = '\n';
+	*ptr = '\0';
+	
+	return buf;
 }
 char *k2v_add_comment(char *_Nonnull buf, char *_Nonnull comment)
 {
-	size_t size = 0;
+	size_t buf_len = (buf != NULL) ? strlen(buf) : 0;
+	size_t comment_len = strlen(comment);
+	size_t total_size = buf_len + comment_len + 5; // "# " + "\n" + '\0'
+	
+	char *ret = malloc(total_size);
+	if (!ret) return NULL;
+	
 	if (buf != NULL) {
-		size += strlen(buf);
-	}
-	size += strlen(comment);
-	char *ret = malloc(size + 8);
-	if (buf != NULL) {
-		sprintf(ret, "%s# %s\n", buf, comment);
+		snprintf(ret, total_size, "%s# %s\n", buf, comment);
 	} else {
-		sprintf(ret, "# %s\n", comment);
+		snprintf(ret, total_size, "# %s\n", comment);
 	}
 	free(buf);
-	// Correct memory size.
-	char *tmp = strdup(ret);
-	free(ret);
-	ret = tmp;
 	return ret;
 }
 char *k2v_add_newline(char *_Nonnull buf)
 {
-	size_t size = 0;
+	size_t buf_len = (buf != NULL) ? strlen(buf) : 0;
+	size_t total_size = buf_len + 2; // "\n" + '\0'
+	
+	char *ret = malloc(total_size);
+	if (!ret) return NULL;
+	
 	if (buf != NULL) {
-		size += strlen(buf);
-	}
-	size += strlen("\n") + 2;
-	char *ret = malloc(size + 8);
-	if (buf != NULL) {
-		sprintf(ret, "%s\n", buf);
+		snprintf(ret, total_size, "%s\n", buf);
 	} else {
-		sprintf(ret, "\n");
+		snprintf(ret, total_size, "\n");
 	}
 	free(buf);
-	// Correct memory size.
-	char *tmp = strdup(ret);
-	free(ret);
-	ret = tmp;
 	return ret;
 }
 static bool is_coment_line(const char *_Nonnull buf)
@@ -412,42 +408,45 @@ static bool is_coment_line(const char *_Nonnull buf)
 }
 static char *remove_comment(const char *_Nonnull buf)
 {
-	// NULL check.
 	if (buf == NULL) {
 		return NULL;
 	}
-	char *ret = NULL;
+	size_t len = strlen(buf);
+	char *ret = malloc(len + 1);
+	if (!ret) return NULL;
+	
+	char *ret_ptr = ret;
 	const char *p = buf;
-	char *line = NULL;
-	while (p != NULL) {
-		if (p == NULL) {
-			break;
-		}
-		line = get_current_line(p);
-		if (line == NULL) {
-			p = goto_next_line(p);
-			continue;
-		}
-		if (is_coment_line(line)) {
-			free(line);
-			p = goto_next_line(p);
-			continue;
-		}
-		if (ret == NULL) {
-			ret = strdup(line);
-			free(line);
-		} else {
-			ret = realloc(ret, strlen(ret) + strlen(line) + 2);
-			strcat(ret, "\n");
-			strcat(ret, line);
+	
+	while (p != NULL && *p != '\0') {
+		const char *next = strchr(p, '\n');
+		size_t line_len = next ? (size_t)(next - p) : strlen(p);
+		
+		char *line = malloc(line_len + 1);
+		if (line) {
+			memcpy(line, p, line_len);
+			line[line_len] = '\0';
+			
+			if (!is_coment_line(line)) {
+				if (ret_ptr != ret) {
+					*ret_ptr++ = '\n';
+				}
+				memcpy(ret_ptr, line, line_len);
+				ret_ptr += line_len;
+			}
 			free(line);
 		}
-		p = goto_next_line(p);
-		if (p == NULL) {
-			break;
-		}
+		
+		p = next ? next + 1 : NULL;
 	}
-	return ret;
+	*ret_ptr = '\0';
+	
+	char *final_ret = NULL;
+	if (ret_ptr != ret) {
+		final_ret = strdup(ret);
+	}
+	free(ret);
+	return final_ret;
 }
 static char *line_get_left(const char *_Nonnull line)
 {
@@ -993,6 +992,7 @@ char *key_get_char(const char *_Nonnull key, const char *_Nonnull buf)
 	char *buf_to_read = k2v_auto_tidy(buf);
 	char *line = key_get_line(key, buf_to_read);
 	if (line == NULL) {
+		free(buf_to_read);
 		return NULL;
 	}
 	char *tmp = line_get_right(line);
@@ -1239,6 +1239,7 @@ int key_get_int_array(const char *_Nonnull key, const char *_Nonnull buf, int *_
 	char *line = key_get_line(key, buf_to_read);
 	if (line == NULL) {
 		array[0] = 0;
+		free(buf_to_read);
 		return 0;
 	}
 	char *tmp = line_get_right(line);
@@ -1353,4 +1354,21 @@ bool have_key(const char *_Nonnull key, const char *_Nonnull buf)
 	free(tmp);
 	free(buf_to_read);
 	return true;
+}
+char *k2v_add_config_func(char *_Nullable buf, char *_Nonnull tmp)
+{
+	size_t size = 4;
+	if (buf != NULL) {
+		size += strlen(buf);
+	}
+	size += strlen(tmp) + 4;
+	char *ret = malloc(size);
+	if (buf != NULL) {
+		sprintf(ret, "%s%s", buf, tmp);
+	} else {
+		sprintf(ret, "%s", tmp);
+	}
+	free(buf);
+	free(tmp);
+	return ret;
 }

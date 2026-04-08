@@ -74,24 +74,8 @@ char *int_array_to_k2v(const char *_Nonnull key, int *_Nonnull val, int len);
 char *float_array_to_k2v(const char *_Nonnull key, float *_Nonnull val, int len);
 size_t k2v_get_filesize(const char *_Nonnull path);
 #define k2v_get_key(type, ...) key_get_##type(__VA_ARGS__)
-#define k2v_add_config(type, __k2v_buf, ...)                              \
-	({                                                                \
-		char *__k2v_tmp = type##_to_k2v(__VA_ARGS__);             \
-		size_t __k2v_size = 4;                                    \
-		if (__k2v_buf != NULL) {                                  \
-			__k2v_size += strlen(__k2v_buf);                  \
-		}                                                         \
-		__k2v_size += strlen(__k2v_tmp) + 4;                      \
-		char *__k2v_ret = malloc(__k2v_size);                     \
-		if (__k2v_buf != NULL) {                                  \
-			sprintf(__k2v_ret, "%s%s", __k2v_buf, __k2v_tmp); \
-		} else {                                                  \
-			sprintf(__k2v_ret, "%s", __k2v_tmp);              \
-		}                                                         \
-		free(__k2v_buf);                                          \
-		free(__k2v_tmp);                                          \
-		__k2v_ret;                                                \
-	})
+char *k2v_add_config_func(char *_Nullable buf, char *_Nonnull tmp);
+#define k2v_add_config(type, __k2v_buf, ...) k2v_add_config_func(__k2v_buf, type##_to_k2v(__VA_ARGS__))
 char *k2v_add_comment(char *_Nullable buf, char *_Nonnull comment);
 char *k2v_add_newline(char *_Nullable buf);
 long long key_get_long(const char *_Nonnull key, const char *_Nonnull buf);
