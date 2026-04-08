@@ -111,7 +111,7 @@ static char *get_current_line(const char *_Nonnull buf)
 	if (newline == NULL) {
 		return strdup(buf);
 	}
-	size_t len = newline - buf;
+	size_t len = (size_t)(newline - buf);
 	char *ret = malloc(len + 1);
 	if (ret) {
 		memcpy(ret, buf, len);
@@ -174,8 +174,13 @@ char *k2v_open_file(const char *_Nonnull path, size_t bufsize)
 		return NULL;
 	}
 	ssize_t len = read(fd, ret, bufsize);
+	if (len < 0) {
+		free(ret);
+		close(fd);
+		return NULL;
+	}
 	ret[len] = '\0';
-	if (len != strlen(ret)) {
+	if ((size_t)len != strlen(ret)) {
 		warning("\033[31m \\0 is not the end of file\n");
 	}
 	__k2v_lint(ret);
@@ -302,7 +307,7 @@ char *int_array_to_k2v(const char *_Nonnull key, int *_Nonnull val, int len)
 		return ret;
 	}
 
-	size_t max_size = strlen(key) + len * 32 + 5; // 32 per int + padding
+	size_t max_size = strlen(key) + (size_t)len * 32 + 5; // 32 per int + padding
 	char *buf = malloc(max_size);
 	if (!buf)
 		return NULL;
@@ -335,7 +340,7 @@ char *float_array_to_k2v(const char *_Nonnull key, float *_Nonnull val, int len)
 		return ret;
 	}
 
-	size_t max_size = strlen(key) + len * 64 + 5; // 64 per float + padding
+	size_t max_size = strlen(key) + (size_t)len * 64 + 5; // 64 per float + padding
 	char *buf = malloc(max_size);
 	if (!buf)
 		return NULL;
