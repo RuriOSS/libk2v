@@ -1,0 +1,28 @@
+name: Daily CI
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential clang
+        sudo apt-get install -y libasan8
+        sudo apt-get install -y make
+
+    - name: Run Tests
+      # If your Makefile doesn't enable ASAN by default, you can pass CFLAGS like this:
+      # run: make CFLAGS="-fsanitize=address -g -O1" LDFLAGS="-fsanitize=address" test
+      run: make test

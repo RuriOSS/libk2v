@@ -20,5 +20,5 @@ clean:
 	rm k2sh *.so *.a||true
 	rm testk2v||true
 test:
-	$(CC) -std=gnu99 -fsanitize=address,undefined -g -O0 -Isrc/include test/test_all.c src/k2v.c -o test/test_all
+	$(CC) -std=gnu99 -fno-omit-frame-pointer -Wno-gnu-zero-variadic-macro-arguments -fno-stack-protector -Wall -Wextra -pedantic -Wconversion -Wno-newline-eof -fsanitize=address,undefined -g -O0 -Isrc/include test/test_all.c src/k2v.c -o test/test_all
 	./test/test_all

@@ -207,7 +207,7 @@ int main()
 	printf("=> Testing with multiple illegal random string iterations...\n");
 	char random_data[1024];
 	for (int iter = 0; iter < 128 * 128; iter++) {
-		srand(iter); // Seed with iteration for reproducibility
+		srand((unsigned int)iter); // Seed with iteration for reproducibility
 		int r_len = rand() % 1023 + 1;
 		for (int i = 0; i < r_len; i++) {
 			// Avoid null terminator in the middle for basic string functions to process it fully
@@ -245,7 +245,7 @@ int main()
 	// Random binary data (multiple iterations)
 	printf("=> Testing with multiple random legal string iterations...\n");
 	for (int iter = 0; iter < 128 * 128; iter++) {
-		srand(iter); // Seed with iteration for reproducibility
+		srand((unsigned int)iter); // Seed with iteration for reproducibility
 		int r_len = rand() % 1023 + 1;
 		for (int i = 0; i < r_len; i++) {
 			// A legal character from ASCII range, but still random
