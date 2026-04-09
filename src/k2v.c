@@ -166,6 +166,9 @@ char *k2v_open_file(const char *_Nonnull path, size_t bufsize)
 	if (path == NULL) {
 		return NULL;
 	}
+	if (k2v_get_filesize(path) > bufsize) {
+		warning("\033[31mFile size is larger than bufsize\n\033[0m");
+	}
 	// bufsize+2 might avoid overflow(I hope).
 	char *ret = (char *)malloc(bufsize + 2);
 	int fd = open(path, O_RDONLY | O_CLOEXEC);
@@ -925,6 +928,9 @@ static void __k2v_lint(const char *_Nonnull buf)
 	if (buf == NULL) {
 		warning("NULL buf");
 		return;
+	}
+	if (strlen(buf) > 1024 * 1024) {
+		warning("Buf is too large");
 	}
 	char *tmp = remove_comment(buf);
 	char *p = tmp;
