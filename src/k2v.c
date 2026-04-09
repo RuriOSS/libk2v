@@ -152,7 +152,7 @@ size_t k2v_get_filesize(const char *_Nonnull path)
 	off_t ret = filestat.st_size;
 	close(fd);
 	// To avoid overflow.
-	return (size_t)ret + 3;
+	return (size_t)ret;
 }
 char *k2v_open_file(const char *_Nonnull path, size_t bufsize)
 {
