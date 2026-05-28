@@ -43,9 +43,11 @@
 	}
 static void __k2v_lint(const char *_Nonnull buf);
 // For warning() macro.
+// NOLINTBEGIN
 // We use global variables here, because we need it to be simple for developers.
 bool k2v_stop_at_warning = false;
 bool k2v_show_warning = true;
+// NOLINTEND
 // Correct backslash.
 static char *correct_backslash(char *buf)
 {
@@ -200,8 +202,9 @@ char *char_to_k2v(const char *_Nonnull key, const char *_Nonnull val)
 	size_t total_size = key_len + val_len + 5; // ="\"\n\0"
 
 	char *ret = malloc(total_size);
-	if (!ret)
+	if (!ret) {
 		return NULL;
+	}
 
 	if (val != NULL) {
 		snprintf(ret, total_size, "%s=\"%s\"\n", key, val);
@@ -265,21 +268,24 @@ char *char_array_to_k2v(const char *_Nonnull key, char *const *_Nonnull val, int
 	if (len == 0 || val == NULL) {
 		size_t size = strlen(key) + 5; // =[]\n\0
 		char *ret = malloc(size);
-		if (ret)
+		if (ret) {
 			snprintf(ret, size, "%s=[]\n", key);
+		}
 		return ret;
 	}
 
 	size_t total_size = strlen(key) + 5; // key + =[\n + \0
 	for (int i = 0; i < len; i++) {
 		total_size += strlen(val[i]) + 2; // ""
-		if (i != len - 1)
+		if (i != len - 1) {
 			total_size += 1; // ,
+		}
 	}
 
 	char *buf = malloc(total_size);
-	if (!buf)
+	if (!buf) {
 		return NULL;
+	}
 
 	char *ptr = buf;
 	ptr += sprintf(ptr, "%s=[", key);
@@ -305,23 +311,26 @@ char *int_array_to_k2v(const char *_Nonnull key, int *_Nonnull val, int len)
 	if (len == 0 || val == NULL) {
 		size_t size = strlen(key) + 5;
 		char *ret = malloc(size);
-		if (ret)
+		if (ret) {
 			snprintf(ret, size, "%s=[]\n", key);
+		}
 		return ret;
 	}
 
-	size_t max_size = strlen(key) + (size_t)len * 32 + 5; // 32 per int + padding
+	size_t max_size = strlen(key) + ((size_t)len * 32) + 5; // 32 per int + padding
 	char *buf = malloc(max_size);
-	if (!buf)
+	if (!buf) {
 		return NULL;
+	}
 
 	char *ptr = buf;
 	ptr += sprintf(ptr, "%s=[", key);
 
 	for (int i = 0; i < len; i++) {
 		ptr += sprintf(ptr, "\"%d\"", val[i]);
-		if (i != len - 1)
+		if (i != len - 1) {
 			*ptr++ = ',';
+		}
 	}
 
 	*ptr++ = ']';
@@ -338,23 +347,26 @@ char *float_array_to_k2v(const char *_Nonnull key, float *_Nonnull val, int len)
 	if (len == 0 || val == NULL) {
 		size_t size = strlen(key) + 5;
 		char *ret = malloc(size);
-		if (ret)
+		if (ret) {
 			snprintf(ret, size, "%s=[]\n", key);
+		}
 		return ret;
 	}
 
-	size_t max_size = strlen(key) + (size_t)len * 64 + 5; // 64 per float + padding
+	size_t max_size = strlen(key) + ((size_t)len * 64) + 5; // 64 per float + padding
 	char *buf = malloc(max_size);
-	if (!buf)
+	if (!buf) {
 		return NULL;
+	}
 
 	char *ptr = buf;
 	ptr += sprintf(ptr, "%s=[", key);
 
 	for (int i = 0; i < len; i++) {
 		ptr += sprintf(ptr, "\"%f\"", (double)val[i]);
-		if (i != len - 1)
+		if (i != len - 1) {
 			*ptr++ = ',';
+		}
 	}
 
 	*ptr++ = ']';
@@ -370,8 +382,9 @@ char *k2v_add_comment(char *_Nonnull buf, char *_Nonnull comment)
 	size_t total_size = buf_len + comment_len + 5; // "# " + "\n" + '\0'
 
 	char *ret = malloc(total_size);
-	if (!ret)
+	if (!ret) {
 		return NULL;
+	}
 
 	if (buf != NULL) {
 		snprintf(ret, total_size, "%s# %s\n", buf, comment);
@@ -387,8 +400,9 @@ char *k2v_add_newline(char *_Nonnull buf)
 	size_t total_size = buf_len + 2; // "\n" + '\0'
 
 	char *ret = malloc(total_size);
-	if (!ret)
+	if (!ret) {
 		return NULL;
+	}
 
 	if (buf != NULL) {
 		snprintf(ret, total_size, "%s\n", buf);
@@ -433,8 +447,9 @@ static char *remove_comment(const char *_Nonnull buf)
 	}
 	size_t len = strlen(buf);
 	char *ret = malloc(len + 1);
-	if (!ret)
+	if (!ret) {
 		return NULL;
+	}
 
 	char *ret_ptr = ret;
 	const char *p = buf;
@@ -479,7 +494,7 @@ static char *line_get_left(const char *_Nonnull line)
 		line = &line[i];
 		break;
 	}
-	char *ret = malloc(strlen(line) + 1);
+	char *ret = malloc(strlen(line) + 3);
 	for (size_t i = 0; i < strlen(line); i++) {
 		if (line[i] == '\\') {
 			if (i < strlen(line) - 2) {
@@ -750,7 +765,7 @@ static int __k2v_array_lint(const char *_Nonnull line)
 			count++;
 		}
 	}
-	if (count != quote / 2 - 1) {
+	if (count != (quote / 2) - 1) {
 		warning("Value should be quoted by `"
 			"`, separated by `,`, and the last value should not have a `,`: %s\n",
 			line);
@@ -894,7 +909,7 @@ static void __k2v_check_singularity(const char *_Nonnull buf)
 		}
 		char *key = line_get_left(line);
 		if (keys == NULL) {
-			keys = malloc(sizeof(char *) * 3);
+			keys = (char **)malloc(sizeof(char *) * 3);
 			keys[0] = key;
 			keys[1] = NULL;
 			count++;
@@ -904,7 +919,7 @@ static void __k2v_check_singularity(const char *_Nonnull buf)
 					warning("Key should be unique: %s\n", line);
 				}
 			}
-			keys = realloc(keys, sizeof(char *) * (count + 2));
+			keys = (char **)realloc((void *)keys, sizeof(char *) * (count + 2));
 			keys[count] = key;
 			keys[count + 1] = NULL;
 			count++;
@@ -921,7 +936,7 @@ static void __k2v_check_singularity(const char *_Nonnull buf)
 	for (int i = 0; keys[i] != NULL; i++) {
 		free(keys[i]);
 	}
-	free(keys);
+	free((void *)keys);
 }
 static void __k2v_lint(const char *_Nonnull buf)
 {
@@ -929,7 +944,7 @@ static void __k2v_lint(const char *_Nonnull buf)
 		warning("NULL buf");
 		return;
 	}
-	if (strlen(buf) > 1024 * 1024) {
+	if (strlen(buf) > (size_t)(1024 * 1024)) {
 		warning("Buf is too large");
 	}
 	char *tmp = remove_comment(buf);
@@ -1174,7 +1189,7 @@ static char *__goto_next_val(const char *_Nonnull p)
 			ret = strchr(&p[i], ',') + 1;
 		}
 	}
-	return (char *)ret;
+	return ret;
 }
 static char *__current_val(const char *_Nonnull p)
 {
@@ -1224,7 +1239,7 @@ static char *__current_val(const char *_Nonnull p)
 }
 static char **array_to_str_array(const char *_Nonnull array)
 {
-	char **ret = malloc(sizeof(char *) * 2);
+	char **ret = (char **)malloc(sizeof(char *) * 2);
 	ret[0] = NULL;
 	if (strcmp(array, "[]") == 0 || strcmp(array, "[\"\"]") == 0) {
 		return ret;
@@ -1242,13 +1257,13 @@ static char **array_to_str_array(const char *_Nonnull array)
 		}
 		p = __goto_next_val(p);
 		if (ret[0] == NULL) {
-			free(ret);
-			ret = malloc(sizeof(char *) * 3);
+			free((void *)ret);
+			ret = (char **)malloc(sizeof(char *) * 3);
 			ret[0] = val;
 			ret[1] = NULL;
 			count++;
 		} else {
-			ret = realloc(ret, sizeof(char *) * (count + 2));
+			ret = (char **)realloc((void *)ret, sizeof(char *) * (count + 2));
 			ret[count] = val;
 			ret[count + 1] = NULL;
 			count++;
@@ -1289,7 +1304,7 @@ int key_get_int_array(const char *_Nonnull key, const char *_Nonnull buf, int *_
 	for (int i = 0; str_array[i] != NULL; i++) {
 		free(str_array[i]);
 	}
-	free(str_array);
+	free((void *)str_array);
 	free(tmp);
 	free(buf_to_read);
 	return ret;
@@ -1327,7 +1342,7 @@ int key_get_char_array(const char *_Nonnull key, const char *_Nonnull buf, char 
 	for (int i = 0; str_array[i] != NULL; i++) {
 		free(str_array[i]);
 	}
-	free(str_array);
+	free((void *)str_array);
 	free(tmp);
 	free(buf_to_read);
 	return ret;
@@ -1365,7 +1380,7 @@ int key_get_float_array(const char *_Nonnull key, const char *_Nonnull buf, floa
 	for (int i = 0; str_array[i] != NULL; i++) {
 		free(str_array[i]);
 	}
-	free(str_array);
+	free((void *)str_array);
 	free(tmp);
 	free(buf_to_read);
 	return ret;
