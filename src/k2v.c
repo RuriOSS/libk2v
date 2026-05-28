@@ -140,7 +140,7 @@ size_t k2v_get_filesize(const char *_Nonnull path)
 {
 	int fd = open(path, O_RDONLY | O_CLOEXEC);
 	if (fd < 0) {
-		fprintf(stderr, "\033[31mNo such file or directory:%s\n\033[0m", path);
+		warning("\033[31mFailed to open file: %s\n\033[0m", path);
 		if (k2v_stop_at_warning) {
 			exit(114);
 		} else {
