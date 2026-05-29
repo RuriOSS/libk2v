@@ -1,4 +1,5 @@
-#include "./k2v.h"
+#include "k2v3.h"
+#include "../src/include/k2v.h"
 int main()
 {
 	char *buf = k2v3_open_file("test.conf");
