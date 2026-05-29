@@ -184,6 +184,9 @@ static struct K2V3_VALUE get_value(struct K2V3_STRING conf)
 				if (conf.str[k] == '"' && conf.str[k - 1] != '\\') {
 					break;
 				}
+				if (k >= i - 1) {
+					k2v3_error("Unterminated array element.");
+				}
 				k++;
 			}
 			// Do not allow null elements, so k-j-1 should >0.
@@ -213,15 +216,19 @@ static struct K2V3_VALUE get_value(struct K2V3_STRING conf)
 			// Skip separators.
 			if (conf.str[j] == ',' || conf.str[j] == ';') {
 				j++;
+				// Do not allow separators at the end of array.
+				while (j < i && (conf.str[j] == ' ' || conf.str[j] == '\n')) {
+					j++;
+				}
+				if (j == i) {
+					k2v3_error("Trailing separator in array is not allowed.");
+				}
 			} else {
 				// If there is no separator, it should be the end of array.
 				if (j < i) {
 					printf("Debug info: conf.str:\n%s\n", conf.str);
 					k2v3_error("Array elements must be separated by ',' or ';'.");
 				}
-			}
-			while (j < i && (conf.str[j] == ' ' || conf.str[j] == '\n')) {
-				j++;
 			}
 		}
 		ret.array_len = array_len;
