@@ -71,6 +71,7 @@ struct K2V3_BUF {
 typedef struct K2V3_BUF *k2v3_cache;
 extern bool k2v_stop_at_warning;
 extern bool k2v_show_warning;
+extern bool k2v3_warning_triggered;
 #define k2v3_error(...)                                                                             \
 	do {                                                                                        \
 		fprintf(stderr, "[libk2v]: in %s() at %s line %d :", __func__, __FILE__, __LINE__); \
@@ -80,6 +81,7 @@ extern bool k2v_show_warning;
 	} while (0)
 #define k2v3_warning(...)                                                                                   \
 	do {                                                                                                \
+		k2v3_warning_triggered = true;                                                              \
 		if (k2v_show_warning || k2v_stop_at_warning) {                                              \
 			fprintf(stderr, "[libk2v]: in %s() at %s line %d :", __func__, __FILE__, __LINE__); \
 			fprintf(stderr, __VA_ARGS__);                                                       \

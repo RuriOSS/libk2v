@@ -30,6 +30,7 @@
 #include "k2v3.h"
 bool k2v_stop_at_warning = false;
 bool k2v_show_warning = true;
+bool k2v3_warning_triggered = false;
 //
 //
 // Parse into cache.
@@ -54,7 +55,7 @@ static char *correct_backslash(char *buf)
 	size_t len = strlen(buf);
 	for (size_t i = 0; i < len; i++) {
 		if (buf[i] == '\\') {
-			if (i < strlen(buf) - 1) {
+			if (i < len - 1) {
 				i++;
 				if (buf[i] == 'n') {
 					ret[j] = '\\';
@@ -76,6 +77,7 @@ static char *correct_backslash(char *buf)
 					ret[j] = buf[i];
 				}
 				j++;
+				ret[j] = '\0';
 				continue;
 			}
 		}
@@ -131,7 +133,7 @@ static struct K2V3_KEY get_key(struct K2V3_STRING conf)
 	// Dump key.
 	ret.key = strndup(conf.str, i);
 	if (!ret.key) {
-		k2v3_error("Failed to allocate memory for key.");
+		k2v3_error("Failed to allocate memory for key. This is an internal error.");
 	}
 	// Get jump length.
 	if (i < conf.len && conf.str[i] == '=') {
@@ -151,7 +153,7 @@ static struct K2V3_VALUE get_value(struct K2V3_STRING conf)
 	// Value can be a scalar or an array.
 	// Value should start with `"` for scalar and `[` for array.
 	if (conf.len == 0) {
-		k2v3_error("Value cannot be empty.");
+		k2v3_error("Internal error: conf is empty. This should not happen because we check it before.");
 	}
 	bool priv_backslash = false;
 	// We allow `[]` for null array, `""` for null scalar.
@@ -231,7 +233,7 @@ static struct K2V3_VALUE get_value(struct K2V3_STRING conf)
 		}
 		ret.scalar_val = strndup(conf.str + 1, i - 1);
 		if (!ret.scalar_val) {
-			k2v3_error("Failed to allocate memory for scalar value.");
+			k2v3_error("Failed to allocate memory for scalar value. This is an internal error.");
 		}
 		// Get jump length.
 		ret.jmp = i + 1;
@@ -364,7 +366,7 @@ static struct K2V3_VALUE get_value(struct K2V3_STRING conf)
 			char **new_array_val = realloc(array_val, sizeof(char *) * (array_len + 1));
 			if (!new_array_val) {
 				free(element);
-				k2v3_error("Failed to allocate memory for array.");
+				k2v3_error("Failed to allocate memory for array. This is an internal error.");
 			}
 			array_val = new_array_val;
 			array_val[array_len] = element;
@@ -527,14 +529,14 @@ k2v3_cache k2v3_parse(char *const _Nonnull buf)
 			struct K2V3_VALUE value = get_value(conf);
 			if (!value.scalar_val && !value.array_val && !value.empty) {
 				printf("Debug info: conf.str:\n%s\n", conf.str);
-				k2v3_error("Failed to parse value.");
+				k2v3_error("Failed to parse value. This is an internal error.");
 			}
 			conf.str += value.jmp;
 			conf.len -= value.jmp;
 			// Add to cache.
 			k2v3_cache node = malloc(sizeof(struct K2V3_BUF));
 			if (!node) {
-				k2v3_error("Failed to allocate cache node.");
+				k2v3_error("Failed to allocate cache node. This is an internal error.");
 			}
 			*node = (struct K2V3_BUF){ .type = value.type, .key = key.key, .next = NULL };
 			if (value.empty) {
@@ -659,31 +661,32 @@ char *k2v3_open_file(char *const _Nonnull path)
 {
 	int fd = open(path, O_RDONLY);
 	if (fd < 0) {
-		k2v3_error("Failed to open file '%s'.", path);
+		return NULL;
 	}
 	struct stat st;
 	if (fstat(fd, &st) < 0) {
 		close(fd);
-		k2v3_error("Failed to get file size for '%s'.", path);
+		return NULL;
 	}
 	if (st.st_size == 0) {
 		close(fd);
-		k2v3_error("File '%s' is empty.", path);
+		return NULL;
 	}
 	if (st.st_size > 128 * 1024) {
 		close(fd);
-		k2v3_error("File '%s' is too large. Maximum allowed size is 128k.", path);
+		k2v3_warning("File size exceeds 128KB, which is the maximum supported size. This file will be ignored.");
+		return NULL;
 	}
 	char *buf = malloc((size_t)st.st_size + 1);
 	if (!buf) {
 		close(fd);
-		k2v3_error("Failed to allocate memory for file content.");
+		return NULL;
 	}
 	ssize_t read_size = read(fd, buf, (size_t)st.st_size);
 	if (read_size < 0) {
 		free(buf);
 		close(fd);
-		k2v3_error("Failed to read file '%s'.", path);
+		return NULL;
 	}
 	buf[read_size] = '\0';
 	close(fd);
@@ -785,7 +788,8 @@ bool k2v3_get_bool(const char *_Nonnull key, k2v3_cache cache)
 		return false;
 	}
 	if (node->empty) {
-		k2v3_error("Key '%s' is empty.", key);
+		k2v3_warning("Key '%s' is empty.", key);
+		return false;
 	}
 	if (strcmp(node->scalar_val, "true") == 0) {
 		return true;
@@ -818,7 +822,8 @@ int k2v3_get_int_array(const char *_Nonnull key, k2v3_cache cache, int *_Nonnull
 {
 	k2v3_cache node = get_key_cache(key, K2V3_ARRAY, cache);
 	if (node == NULL) {
-		k2v3_error("Key '%s' not found.", key);
+		k2v3_warning("Key '%s' not found.", key);
+		return 0;
 	}
 	if (node->empty) {
 		return 0;
@@ -832,10 +837,14 @@ int k2v3_get_int_array(const char *_Nonnull key, k2v3_cache cache, int *_Nonnull
 		char *endptr;
 		long val = strtol(node->array_val[i], &endptr, 10);
 		if (*endptr != '\0') {
-			k2v3_error("Value '%s' in array for key '%s' is not a valid integer.", node->array_val[i], key);
+			k2v3_warning("Value '%s' in array for key '%s' is not a valid integer.", node->array_val[i], key);
+			val = 0;
+			continue;
 		}
 		if (val > INT_MAX || val < INT_MIN) {
-			k2v3_error("Value '%s' in array for key '%s' is too large for int.", node->array_val[i], key);
+			k2v3_warning("Value '%s' in array for key '%s' is too large for int.", node->array_val[i], key);
+			val = 0;
+			continue;
 		}
 		array[count++] = (int)val;
 	}
@@ -880,7 +889,8 @@ int k2v3_get_float_array(const char *_Nonnull key, k2v3_cache cache, float *_Non
 		char *endptr;
 		float val = strtof(node->array_val[i], &endptr);
 		if (*endptr != '\0') {
-			k2v3_error("Value '%s' in array for key '%s' is not a valid float.", node->array_val[i], key);
+			k2v3_warning("Value '%s' in array for key '%s' is not a valid float.", node->array_val[i], key);
+			val = 0;
 		}
 		array[count++] = val;
 	}
@@ -905,7 +915,8 @@ int k2v3_get_long_array(const char *_Nonnull key, k2v3_cache cache, long long *_
 		char *endptr;
 		long long val = strtoll(node->array_val[i], &endptr, 10);
 		if (*endptr != '\0') {
-			k2v3_error("Value '%s' in array for key '%s' is not a valid long integer.", node->array_val[i], key);
+			k2v3_warning("Value '%s' in array for key '%s' is not a valid long integer.", node->array_val[i], key);
+			val = 0;
 		}
 		array[count++] = val;
 	}
