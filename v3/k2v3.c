@@ -104,13 +104,20 @@ static struct K2V3_VALUE get_value(struct K2V3_STRING conf)
 			ret.empty = true;
 			return ret;
 		}
-		if (conf.str[0] == '[' && conf.str[1] == ']') {
-			ret.type = K2V3_ARRAY;
-			ret.array_len = 0;
-			ret.array_val = NULL;
-			ret.jmp = 2;
-			ret.empty = true;
-			return ret;
+		if (conf.str[0] == '[') {
+			// skip spaces after `[`.
+			size_t spaces = 0;
+			while (conf.str[spaces + 1] == ' ') {
+				spaces++;
+			}
+			if (conf.str[spaces + 1] == ']') {
+				ret.type = K2V3_ARRAY;
+				ret.array_len = 0;
+				ret.array_val = NULL;
+				ret.jmp = spaces + 2;
+				ret.empty = true;
+				return ret;
+			}
 		}
 	}
 	// Parse value.
@@ -470,7 +477,7 @@ int k2v3_get_int(const char *_Nonnull key, k2v3_cache cache)
 	}
 	char *endptr;
 	long ret = strtol(node->scalar_val, &endptr, 10);
-	if (*endptr != '0') {
+	if (*endptr != '\0') {
 		return 0;
 	}
 	if (ret > INT_MAX) {
@@ -543,9 +550,12 @@ int k2v3_get_int_array(const char *_Nonnull key, k2v3_cache cache, int *_Nonnull
 	int count = 0;
 	for (size_t i = 0; i < node->array_len; i++) {
 		char *endptr;
-		long long val = strtoll(node->array_val[i], &endptr, 10);
+		long val = strtol(node->array_val[i], &endptr, 10);
 		if (*endptr != '\0') {
-			k2v3_error("Value '%s' in array for key '%s' is not a valid long integer.", node->array_val[i], key);
+			k2v3_error("Value '%s' in array for key '%s' is not a valid integer.", node->array_val[i], key);
+		}
+		if (val > INT_MAX) {
+			k2v3_error("Value '%s' in array for key '%s' is too large for int.", node->array_val[i], key);
 		}
 		array[count++] = (int)val;
 	}
