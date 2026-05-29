@@ -107,10 +107,10 @@ static struct K2V3_VALUE get_value(struct K2V3_STRING conf)
 		if (conf.str[0] == '[') {
 			// skip spaces after `[`.
 			size_t spaces = 0;
-			while (conf.str[spaces + 1] == ' ') {
+			while (spaces + 1 < conf.len && conf.str[spaces + 1] == ' ') {
 				spaces++;
 			}
-			if (conf.str[spaces + 1] == ']') {
+			if (spaces + 1 < conf.len && conf.str[spaces + 1] == ']') {
 				ret.type = K2V3_ARRAY;
 				ret.array_len = 0;
 				ret.array_val = NULL;
