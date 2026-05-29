@@ -140,12 +140,11 @@ static struct K2V3_VALUE get_value(struct K2V3_STRING conf)
 		}
 		size_t i = 1;
 		while (i < conf.len) {
-			if (conf.str[i] == '\\' && !priv_backslash) {
-				priv_backslash = true;
-			} else {
+			if (priv_backslash) {
 				priv_backslash = false;
-			}
-			if (conf.str[i] == '"' && !priv_backslash) {
+			} else if (conf.str[i] == '\\') {
+				priv_backslash = true;
+			} else if (conf.str[i] == '"') {
 				break;
 			}
 			if (i >= boundary) {
@@ -193,12 +192,11 @@ static struct K2V3_VALUE get_value(struct K2V3_STRING conf)
 		// Newline is allowed in array values, so we do not consider newline as boundary here.
 		size_t i = 1;
 		while (i < conf.len) {
-			if (conf.str[i] == '\\' && !priv_backslash) {
-				priv_backslash = true;
-			} else {
+			if (priv_backslash) {
 				priv_backslash = false;
-			}
-			if (conf.str[i] == ']' && !priv_backslash) {
+			} else if (conf.str[i] == '\\') {
+				priv_backslash = true;
+			} else if (conf.str[i] == ']') {
 				break;
 			}
 			i++;
@@ -251,12 +249,11 @@ static struct K2V3_VALUE get_value(struct K2V3_STRING conf)
 			// Get the next unescaped `"` character.
 			size_t k = j + 1;
 			while (k < i) {
-				if (conf.str[k] == '\\' && !priv_backslash) {
-					priv_backslash = true;
-				} else {
+				if (priv_backslash) {
 					priv_backslash = false;
-				}
-				if (conf.str[k] == '"' && !priv_backslash) {
+				} else if (conf.str[k] == '\\') {
+					priv_backslash = true;
+				} else if (conf.str[k] == '"') {
 					break;
 				}
 				if (k >= i - 1) {
@@ -304,7 +301,7 @@ static struct K2V3_VALUE get_value(struct K2V3_STRING conf)
 				ret.type = K2V3_SCALAR;
 				ret.empty = true;
 				// Goto next line or end of string.
-				char *newline = memchr(conf.str + ret.jmp, '\n', conf.len - ret.jmp);
+				char *newline = memchr(conf.str, '\n', conf.len);
 				if (newline) {
 					ret.jmp = (size_t)(newline - conf.str) + 1;
 				} else {
@@ -357,7 +354,7 @@ static struct K2V3_VALUE get_value(struct K2V3_STRING conf)
 					}
 					free(array_val);
 					// Goto next line or end of string.
-					char *newline = memchr(conf.str + ret.jmp, '\n', conf.len - ret.jmp);
+					char *newline = memchr(conf.str, '\n', conf.len);
 					if (newline) {
 						ret.jmp = (size_t)(newline - conf.str) + 1;
 					} else {
@@ -439,6 +436,7 @@ k2v3_cache k2v3_parse(char *const _Nonnull buf)
 			}
 			conf.str = newline + 1;
 			conf.len = strlen(conf.str);
+			continue;
 		}
 		// Skip comments and empty lines.
 		if (conf.str[0] == '\n') {
@@ -518,7 +516,7 @@ k2v3_cache k2v3_parse(char *const _Nonnull buf)
 						}
 						free(node);
 						free(key.key);
-						return ret;
+						break;
 					}
 					cur = cur->next;
 				}
