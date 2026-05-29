@@ -64,15 +64,23 @@ static struct K2V3_KEY get_key(struct K2V3_STRING conf)
 	size_t i = 0;
 	while (i < conf.len && conf.str[i] != '=' && conf.str[i] != '\n') {
 		if (conf.str[i] == ' ') {
-			k2v3_error("Spaces are not allowed in keys.");
+			k2v3_warning("Spaces are not allowed in keys.");
+			ret.key = NULL;
+			ret.jmp = 0;
+			return ret;
 		}
 		if (!((conf.str[i] >= '0' && conf.str[i] <= '9') || (conf.str[i] >= 'a' && conf.str[i] <= 'z') || (conf.str[i] >= 'A' && conf.str[i] <= 'Z') || conf.str[i] == '_')) {
-			k2v3_error("Invalid character in key, got '%c'. Only 0-9, a-z, A-Z and '_' are allowed.", conf.str[i]);
+			k2v3_warning("Invalid character in key, got '%c'. Only 0-9, a-z, A-Z and '_' are allowed.", conf.str[i]);
+			ret.key = NULL;
+			return ret;
 		}
 		i++;
 	}
 	if (i == 0) {
-		k2v3_error("Key cannot be empty.");
+		k2v3_warning("Key cannot be empty.");
+		ret.key = NULL;
+		ret.jmp = 0;
+		return ret;
 	}
 	// Dump key.
 	ret.key = strndup(conf.str, i);
@@ -83,7 +91,11 @@ static struct K2V3_KEY get_key(struct K2V3_STRING conf)
 	if (i < conf.len && conf.str[i] == '=') {
 		ret.jmp = i + 1;
 	} else {
-		k2v3_error("Key must end with '='.");
+		k2v3_warning("Key must end with '='");
+		free(ret.key);
+		ret.key = NULL;
+		ret.jmp = 0;
+		return ret;
 	}
 	return ret;
 }
@@ -136,13 +148,33 @@ static struct K2V3_VALUE get_value(struct K2V3_STRING conf)
 				break;
 			}
 			if (i >= boundary) {
-				k2v3_error("Unterminated scalar value.");
+				k2v3_warning("Unterminated scalar value.");
+				ret.type = K2V3_SCALAR;
+				ret.empty = true;
+				// Goto next line or end of string.
+				char *newline = memchr(conf.str, '\n', conf.len);
+				if (newline) {
+					ret.jmp = (size_t)(newline - conf.str) + 1;
+				} else {
+					ret.jmp = conf.len;
+				}
+				return ret;
 			}
 			i++;
 		}
 		// Dump scalar value.
 		if (i >= conf.len) {
-			k2v3_error("Unterminated scalar value.");
+			k2v3_warning("Unterminated scalar value.");
+			ret.type = K2V3_SCALAR;
+			ret.empty = true;
+			// Goto next line or end of string.
+			char *newline = memchr(conf.str, '\n', conf.len);
+			if (newline) {
+				ret.jmp = (size_t)(newline - conf.str) + 1;
+			} else {
+				ret.jmp = conf.len;
+			}
+			return ret;
 		}
 		ret.scalar_val = strndup(conf.str + 1, i - 1);
 		if (!ret.scalar_val) {
@@ -163,7 +195,17 @@ static struct K2V3_VALUE get_value(struct K2V3_STRING conf)
 			i++;
 		}
 		if (i >= conf.len) {
-			k2v3_error("Unterminated array value.");
+			k2v3_warning("Unterminated array value.");
+			ret.type = K2V3_SCALAR;
+			ret.empty = true;
+			// Goto next line or end of string.
+			char *newline = memchr(conf.str, '\n', conf.len);
+			if (newline) {
+				ret.jmp = (size_t)(newline - conf.str) + 1;
+			} else {
+				ret.jmp = conf.len;
+			}
+			return ret;
 		}
 		// Get array elements.
 		// Each element should be a scalar value, and separated by `,` or `;`.
@@ -174,7 +216,21 @@ static struct K2V3_VALUE get_value(struct K2V3_STRING conf)
 		while (j < i) {
 			// First is `"`.
 			if (conf.str[j] != '"') {
-				k2v3_error("Array elements must start with '\"'.");
+				k2v3_warning("Array elements must start with '\"'.");
+				for (size_t i = 0; i < array_len; i++) {
+					free(array_val[i]);
+				}
+				free(array_val);
+				ret.type = K2V3_SCALAR;
+				ret.empty = true;
+				// Goto next line or end of string.
+				char *newline = memchr(conf.str, '\n', conf.len);
+				if (newline) {
+					ret.jmp = (size_t)(newline - conf.str) + 1;
+				} else {
+					ret.jmp = conf.len;
+				}
+				return ret;
 			}
 			// Get the string until the next unescaped `"` character.
 			// If there is no next unescaped `"` character before the boundary, it's an error.
@@ -185,18 +241,56 @@ static struct K2V3_VALUE get_value(struct K2V3_STRING conf)
 					break;
 				}
 				if (k >= i - 1) {
-					k2v3_error("Unterminated array element.");
+					k2v3_warning("Unterminated array element.");
+					for (size_t i = 0; i < array_len; i++) {
+						free(array_val[i]);
+					}
+					free(array_val);
+					ret.type = K2V3_SCALAR;
+					ret.empty = true;
+					// Goto next line or end of string.
+					char *newline = memchr(conf.str, '\n', conf.len);
+					if (newline) {
+						ret.jmp = (size_t)(newline - conf.str) + 1;
+					} else {
+						ret.jmp = conf.len;
+					}
+					return ret;
 				}
 				k++;
 			}
 			// Do not allow null elements, so k-j-1 should >0.
 			if (k - j - 1 <= 0) {
-				k2v3_error("NULL element in array is not allowed");
+				k2v3_warning("NULL element in array is not allowed");
+				for (size_t i = 0; i < array_len; i++) {
+					free(array_val[i]);
+				}
+				free(array_val);
+				ret.type = K2V3_SCALAR;
+				ret.empty = true;
+				// Goto next line or end of string.
+				char *newline = memchr(conf.str, '\n', conf.len);
+				if (newline) {
+					ret.jmp = (size_t)(newline - conf.str) + 1;
+				} else {
+					ret.jmp = conf.len;
+				}
+				return ret;
 			}
 			// Dump array element.
 			char *element = strndup(conf.str + j + 1, k - j - 1);
 			if (!element) {
-				k2v3_error("Failed to allocate memory for array element.");
+				k2v3_warning("Failed to allocate memory for array element.");
+				ret.type = K2V3_SCALAR;
+				ret.empty = true;
+				// Goto next line or end of string.
+				char *newline = memchr(conf.str, '\n', conf.len);
+				if (newline) {
+					ret.jmp = (size_t)(newline - conf.str) + 1;
+				} else {
+					ret.jmp = conf.len;
+				}
+				return ret;
 			}
 			// Add to array.
 			char **new_array_val = realloc(array_val, sizeof(char *) * (array_len + 1));
@@ -221,13 +315,35 @@ static struct K2V3_VALUE get_value(struct K2V3_STRING conf)
 					j++;
 				}
 				if (j == i) {
-					k2v3_error("Trailing separator in array is not allowed.");
+					k2v3_warning("Trailing separator in array is not allowed.");
+					ret.type = K2V3_SCALAR;
+					ret.empty = true;
+					for (size_t i = 0; i < array_len; i++) {
+						free(array_val[i]);
+					}
+					free(array_val);
+					// Goto next line or end of string.
+					ret.jmp = i + 1;
+					return ret;
 				}
 			} else {
 				// If there is no separator, it should be the end of array.
 				if (j < i) {
-					printf("Debug info: conf.str:\n%s\n", conf.str);
-					k2v3_error("Array elements must be separated by ',' or ';'.");
+					k2v3_warning("Array elements must be separated by ',' or ';'.");
+					ret.type = K2V3_SCALAR;
+					ret.empty = true;
+					for (size_t i = 0; i < array_len; i++) {
+						free(array_val[i]);
+					}
+					free(array_val);
+					// Goto next line or end of string.
+					char *newline = memchr(conf.str, '\n', conf.len);
+					if (newline) {
+						ret.jmp = (size_t)(newline - conf.str) + 1;
+					} else {
+						ret.jmp = conf.len;
+					}
+					return ret;
 				}
 			}
 		}
@@ -236,12 +352,39 @@ static struct K2V3_VALUE get_value(struct K2V3_STRING conf)
 		// Get jump length.
 		ret.jmp = i + 1;
 	} else {
-		k2v3_error("Value must start with '\"' for scalar or '[' for array.");
+		k2v3_warning("Value must start with '\"' for scalar or '[' for array.");
+		ret.type = K2V3_SCALAR;
+		ret.empty = true;
+		// Goto next line or end of string.
+		char *newline = memchr(conf.str, '\n', conf.len);
+		if (newline) {
+			ret.jmp = (size_t)(newline - conf.str) + 1;
+		} else {
+			ret.jmp = conf.len;
+		}
+		return ret;
 	}
 	// Ensure the value is followed by a newline or end of string.
 	if (ret.jmp < conf.len && conf.str[ret.jmp] != '\n') {
-		printf("Debug info: conf.str:\n%s\n", conf.str);
-		k2v3_error("Value must be followed by a newline, but got '%c'.", conf.str[ret.jmp]);
+		k2v3_warning("Value must be followed by a newline, but got '%c'.", conf.str[ret.jmp]);
+		if (ret.type == K2V3_ARRAY) {
+			for (size_t i = 0; i < ret.array_len; i++) {
+				free(ret.array_val[i]);
+			}
+			free(ret.array_val);
+		} else {
+			free(ret.scalar_val);
+		}
+		ret.type = K2V3_SCALAR;
+		ret.empty = true;
+		// Goto next line or end of string.
+		char *newline = memchr(conf.str, '\n', conf.len);
+		if (newline) {
+			ret.jmp = (size_t)(newline - conf.str) + 1;
+		} else {
+			ret.jmp = conf.len;
+		}
+		return ret;
 	}
 	return ret;
 }
@@ -252,49 +395,48 @@ k2v3_cache k2v3_parse(char *const _Nonnull buf)
 	while (conf.len > 0) {
 		// We do not allow leading spaces.
 		if (conf.str[0] == ' ') {
-			k2v3_error("Leading spaces are not allowed.");
-		}
-		if (strlen(conf.str) != conf.len) {
-			printf("Debug info: conf.str:\n%s\n", conf.str);
-			k2v3_error("Internal error: string length mismatch. Expected %zu but got %zu.", conf.len, strlen(conf.str));
-		}
-		// Skip comments and empty lines.
-		if (conf.str[0] == '\n') {
-			if (strlen(conf.str) != conf.len) {
-				printf("Debug info: conf.str:\n%s\n", conf.str);
-				k2v3_error("Internal error: string length mismatch. Expected %zu but got %zu.", conf.len, strlen(conf.str));
-			}
-			conf.str++;
-			conf.len--;
-			continue;
-		}
-		if (conf.str[0] == '#') {
-			if (strlen(conf.str) != conf.len) {
-				printf("Debug info: conf.str:\n%s\n", conf.str);
-				k2v3_error("Internal error: string length mismatch. Expected %zu but got %zu.", conf.len, strlen(conf.str));
-			}
+			k2v3_warning("Leading spaces are not allowed.");
+			// Goto next line.
 			char *newline = memchr(conf.str, '\n', conf.len);
 			if (!newline) {
 				break;
 			}
 			conf.str = newline + 1;
 			conf.len = strlen(conf.str);
-			if (strlen(conf.str) != conf.len) {
-				printf("Debug info: conf.str:\n%s\n", conf.str);
-				k2v3_error("Internal error: string length mismatch. Expected %zu but got %zu.", conf.len, strlen(conf.str));
+		}
+		// Skip comments and empty lines.
+		if (conf.str[0] == '\n') {
+			conf.str++;
+			conf.len--;
+			continue;
+		}
+		if (conf.str[0] == '#') {
+			char *newline = memchr(conf.str, '\n', conf.len);
+			if (!newline) {
+				break;
 			}
+			conf.str = newline + 1;
+			conf.len = strlen(conf.str);
 			continue;
 		} else {
 			// Get key.
 			struct K2V3_KEY key = get_key(conf);
 			if (!key.key) {
-				k2v3_error("Failed to parse key.");
+				k2v3_warning("Failed to parse key.");
+				// Goto next line.
+				char *newline = memchr(conf.str, '\n', conf.len);
+				if (!newline) {
+					break;
+				}
+				conf.str = newline + 1;
+				conf.len = strlen(conf.str);
+				continue;
 			}
 			conf.str += key.jmp;
 			conf.len -= key.jmp;
-			if (strlen(conf.str) != conf.len) {
-				printf("Debug info: conf.str:\n%s\n", conf.str);
-				k2v3_error("Internal error: string length mismatch after parsing key. Expected %zu but got %zu.", conf.len, strlen(conf.str));
+			if (conf.len == 0) {
+				free(key.key);
+				return ret;
 			}
 			// Get value.
 			struct K2V3_VALUE value = get_value(conf);
@@ -304,10 +446,6 @@ k2v3_cache k2v3_parse(char *const _Nonnull buf)
 			}
 			conf.str += value.jmp;
 			conf.len -= value.jmp;
-			if (strlen(conf.str) != conf.len) {
-				printf("Debug info: conf.str:\n%s\n", conf.str);
-				k2v3_error("Internal error: string length mismatch after parsing value. Expected %zu but got %zu.", conf.len, strlen(conf.str));
-			}
 			// Add to cache.
 			k2v3_cache node = malloc(sizeof(struct K2V3_BUF));
 			if (!node) {
@@ -333,12 +471,34 @@ k2v3_cache k2v3_parse(char *const _Nonnull buf)
 				while (cur->next != NULL) {
 					// Also check for duplicate keys.
 					if (strcmp(cur->key, key.key) == 0) {
-						k2v3_error("Duplicate keys are not allowed.");
+						k2v3_warning("Duplicate keys are not allowed.");
+						if (node->type == K2V3_ARRAY) {
+							for (size_t i = 0; i < node->array_len; i++) {
+								free(node->array_val[i]);
+							}
+							free(node->array_val);
+						} else {
+							free(node->scalar_val);
+						}
+						free(node);
+						free(key.key);
+						return ret;
 					}
 					cur = cur->next;
 				}
 				if (strcmp(cur->key, key.key) == 0) {
-					k2v3_error("Duplicate keys are not allowed.");
+					k2v3_warning("Duplicate keys are not allowed.");
+					if (node->type == K2V3_ARRAY) {
+						for (size_t i = 0; i < node->array_len; i++) {
+							free(node->array_val[i]);
+						}
+						free(node->array_val);
+					} else {
+						free(node->scalar_val);
+					}
+					free(node);
+					free(key.key);
+					return ret;
 				}
 				cur->next = node;
 			}
@@ -466,7 +626,8 @@ char *k2v3_get_char(const char *_Nonnull key, k2v3_cache cache)
 {
 	k2v3_cache node = get_key_cache(key, K2V3_SCALAR, cache);
 	if (node == NULL) {
-		k2v3_error("Key '%s' not found.", key);
+		k2v3_warning("Key '%s' not found.", key);
+		return NULL;
 	}
 	if (node->empty) {
 		return NULL;
@@ -477,7 +638,8 @@ int k2v3_get_int(const char *_Nonnull key, k2v3_cache cache)
 {
 	k2v3_cache node = get_key_cache(key, K2V3_SCALAR, cache);
 	if (node == NULL) {
-		k2v3_error("Key '%s' not found.", key);
+		k2v3_warning("Key '%s' not found.", key);
+		return 0;
 	}
 	if (node->empty) {
 		return 0;
@@ -488,7 +650,7 @@ int k2v3_get_int(const char *_Nonnull key, k2v3_cache cache)
 		return 0;
 	}
 	if (ret > INT_MAX || ret < INT_MIN) {
-		k2v3_error("Value for key '%s' is too large for int.", key);
+		k2v3_warning("Value for key '%s' is too large for int.", key);
 		return 0;
 	}
 	return (int)ret;
@@ -497,7 +659,8 @@ float k2v3_get_float(const char *_Nonnull key, k2v3_cache cache)
 {
 	k2v3_cache node = get_key_cache(key, K2V3_SCALAR, cache);
 	if (node == NULL) {
-		k2v3_error("Key '%s' not found.", key);
+		k2v3_warning("Key '%s' not found.", key);
+		return 0;
 	}
 	if (node->empty) {
 		return 0;
@@ -505,7 +668,8 @@ float k2v3_get_float(const char *_Nonnull key, k2v3_cache cache)
 	char *endptr;
 	float val = strtof(node->scalar_val, &endptr);
 	if (*endptr != '\0') {
-		k2v3_error("Value for key '%s' is not a valid float.", key);
+		k2v3_warning("Value for key '%s' is not a valid float.", key);
+		return 0;
 	}
 	return val;
 }
@@ -513,7 +677,8 @@ bool k2v3_get_bool(const char *_Nonnull key, k2v3_cache cache)
 {
 	k2v3_cache node = get_key_cache(key, K2V3_SCALAR, cache);
 	if (node == NULL) {
-		k2v3_error("Key '%s' not found.", key);
+		k2v3_warning("Key '%s' not found.", key);
+		return false;
 	}
 	if (node->empty) {
 		k2v3_error("Key '%s' is empty.", key);
@@ -523,14 +688,16 @@ bool k2v3_get_bool(const char *_Nonnull key, k2v3_cache cache)
 	} else if (strcmp(node->scalar_val, "false") == 0) {
 		return false;
 	} else {
-		k2v3_error("Value for key '%s' is not a valid boolean. Expected 'true' or 'false' but got '%s'.", key, node->scalar_val);
+		k2v3_warning("Value for key '%s' is not a valid boolean. Expected 'true' or 'false' but got '%s'.", key, node->scalar_val);
+		return false;
 	}
 }
 long long k2v3_get_long(const char *_Nonnull key, k2v3_cache cache)
 {
 	k2v3_cache node = get_key_cache(key, K2V3_SCALAR, cache);
 	if (node == NULL) {
-		k2v3_error("Key '%s' not found.", key);
+		k2v3_warning("Key '%s' not found.", key);
+		return 0;
 	}
 	if (node->empty) {
 		return 0;
@@ -538,7 +705,8 @@ long long k2v3_get_long(const char *_Nonnull key, k2v3_cache cache)
 	char *endptr;
 	long long ret = strtoll(node->scalar_val, &endptr, 10);
 	if (*endptr != '\0') {
-		k2v3_error("Value for key '%s' is not a valid long integer.", key);
+		k2v3_warning("Value for key '%s' is not a valid long integer.", key);
+		return 0;
 	}
 	return ret;
 }
@@ -552,7 +720,8 @@ int k2v3_get_int_array(const char *_Nonnull key, k2v3_cache cache, int *_Nonnull
 		return 0;
 	}
 	if (node->array_len > (size_t)limit) {
-		k2v3_error("Array length for key '%s' exceeds the limit of %d.", key, limit);
+		k2v3_warning("Array length for key '%s' exceeds the limit of %d.", key, limit);
+		return 0;
 	}
 	int count = 0;
 	for (size_t i = 0; i < node->array_len; i++) {
@@ -572,13 +741,15 @@ int k2v3_get_char_array(const char *_Nonnull key, k2v3_cache cache, char *_Nonnu
 {
 	k2v3_cache node = get_key_cache(key, K2V3_ARRAY, cache);
 	if (node == NULL) {
-		k2v3_error("Key '%s' not found.", key);
+		k2v3_warning("Key '%s' not found.", key);
+		return 0;
 	}
 	if (node->empty) {
 		return 0;
 	}
 	if (node->array_len > (size_t)limit) {
-		k2v3_error("Array length for key '%s' exceeds the limit of %d.", key, limit);
+		k2v3_warning("Array length for key '%s' exceeds the limit of %d.", key, limit);
+		return 0;
 	}
 	int count = 0;
 	for (size_t i = 0; i < node->array_len; i++) {
@@ -590,13 +761,15 @@ int k2v3_get_float_array(const char *_Nonnull key, k2v3_cache cache, float *_Non
 {
 	k2v3_cache node = get_key_cache(key, K2V3_ARRAY, cache);
 	if (node == NULL) {
-		k2v3_error("Key '%s' not found.", key);
+		k2v3_warning("Key '%s' not found.", key);
+		return 0;
 	}
 	if (node->empty) {
 		return 0;
 	}
 	if (node->array_len > (size_t)limit) {
-		k2v3_error("Array length for key '%s' exceeds the limit of %d.", key, limit);
+		k2v3_warning("Array length for key '%s' exceeds the limit of %d.", key, limit);
+		return 0;
 	}
 	int count = 0;
 	for (size_t i = 0; i < node->array_len; i++) {
@@ -613,13 +786,15 @@ int k2v3_get_long_array(const char *_Nonnull key, k2v3_cache cache, long long *_
 {
 	k2v3_cache node = get_key_cache(key, K2V3_ARRAY, cache);
 	if (node == NULL) {
-		k2v3_error("Key '%s' not found.", key);
+		k2v3_warning("Key '%s' not found.", key);
+		return 0;
 	}
 	if (node->empty) {
 		return 0;
 	}
 	if (node->array_len > (size_t)limit) {
-		k2v3_error("Array length for key '%s' exceeds the limit of %d.", key, limit);
+		k2v3_warning("Array length for key '%s' exceeds the limit of %d.", key, limit);
+		return 0;
 	}
 	int count = 0;
 	for (size_t i = 0; i < node->array_len; i++) {

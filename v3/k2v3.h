@@ -90,7 +90,6 @@ typedef struct K2V3_BUF *k2v3_cache;
 		fprintf(stderr, __VA_ARGS__);                                                       \
 		fprintf(stderr, "\n");                                                              \
 	} while (0)
-
 k2v3_cache k2v3_parse(char *const _Nonnull buf);
 void k2v3_free_cache(k2v3_cache *cache);
 char *k2v3_open_file(char *const _Nonnull path);
