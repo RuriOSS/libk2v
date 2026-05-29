@@ -35,6 +35,57 @@ bool k2v_show_warning = true;
 // Parse into cache.
 //
 //
+static char *correct_backslash(char *buf)
+{
+	/*
+	 * Delete the backslash.
+	 * '\n' -> '\n' (no change)
+	 * '\t' -> '\t' (no change)
+	 * '\r' -> '\r' (no change)
+	 * '\\' -> '\' (delete one backslash)
+	 * '\x' -> 'x' (delete the backslash)
+	 * '\0' -> '0' (delete the backslash)
+	 * '\"' -> '\"' (no change)
+	 * As I need it to follow the Shell standard,
+	 * '\"' will output as '\"'.
+	 */
+	char *ret = strdup(buf);
+	int j = 0;
+	size_t len = strlen(buf);
+	for (size_t i = 0; i < len; i++) {
+		if (buf[i] == '\\') {
+			if (i < strlen(buf) - 1) {
+				i++;
+				if (buf[i] == 'n') {
+					ret[j] = '\\';
+					j++;
+					ret[j] = 'n';
+				} else if (buf[i] == 't') {
+					ret[j] = '\\';
+					j++;
+					ret[j] = 't';
+				} else if (buf[i] == 'r') {
+					ret[j] = '\\';
+					j++;
+					ret[j] = 'r';
+				} else if (buf[i] == '"') {
+					ret[j] = '\\';
+					j++;
+					ret[j] = '"';
+				} else {
+					ret[j] = buf[i];
+				}
+				j++;
+				continue;
+			}
+		}
+		ret[j] = buf[i];
+		j++;
+		ret[j] = '\0';
+	}
+	free(buf);
+	return ret;
+}
 struct K2V3_STRING {
 	char *str;
 	size_t len;
@@ -540,6 +591,22 @@ k2v3_cache k2v3_parse(char *const _Nonnull buf)
 				}
 			}
 		}
+	}
+	// Correct backslash in value.
+	k2v3_cache tmp = ret;
+	while (tmp != NULL) {
+		if (tmp->empty) {
+			tmp = tmp->next;
+			continue;
+		}
+		if (tmp->type == K2V3_ARRAY) {
+			for (size_t i = 0; i < tmp->array_len; i++) {
+				tmp->array_val[i] = correct_backslash(tmp->array_val[i]);
+			}
+		} else {
+			tmp->scalar_val = correct_backslash(tmp->scalar_val);
+		}
+		tmp = tmp->next;
 	}
 	return ret;
 }
