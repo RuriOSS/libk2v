@@ -84,11 +84,17 @@ typedef struct K2V3_BUF *k2v3_cache;
 		fprintf(stderr, "\n");                                                              \
 		exit(114);                                                                          \
 	} while (0)
+#define k2v3_warning(...)                                                                           \
+	do {                                                                                        \
+		fprintf(stderr, "[libk2v]: in %s() at %s line %d :", __func__, __FILE__, __LINE__); \
+		fprintf(stderr, __VA_ARGS__);                                                       \
+		fprintf(stderr, "\n");                                                              \
+	} while (0)
 
 k2v3_cache k2v3_parse(char *const _Nonnull buf);
 void k2v3_free_cache(k2v3_cache *cache);
 char *k2v3_open_file(char *const _Nonnull path);
-bool k2v3_have_key(k2v3_cache cache, char *const _Nonnull key, enum K2V3_TYPE type);
+int k2v3_have_key(k2v3_cache cache, char *const _Nonnull key, enum K2V3_TYPE type);
 char *k2v3_get_char(const char *_Nonnull key, k2v3_cache cache);
 int k2v3_get_int(const char *_Nonnull key, k2v3_cache cache);
 float k2v3_get_float(const char *_Nonnull key, k2v3_cache cache);

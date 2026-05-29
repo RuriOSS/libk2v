@@ -160,7 +160,6 @@ static struct K2V3_VALUE get_value(struct K2V3_STRING conf)
 		}
 		// Get array elements.
 		// Each element should be a scalar value, and separated by `,` or `;`.
-		// We do not allow trailing separators, so the last element should not be followed by `,` or `;`.
 		// We also do not allow empty elements.
 		size_t array_len = 0;
 		char **array_val = NULL;
@@ -180,11 +179,9 @@ static struct K2V3_VALUE get_value(struct K2V3_STRING conf)
 				}
 				k++;
 			}
-			if (k == 0) {
-				k2v3_error("Empty array element.");
-			}
-			if (k >= i) {
-				k2v3_error("Unterminated array element.");
+			// Do not allow null elements, so k-j-1 should >0.
+			if (k - j - 1 <= 0) {
+				k2v3_error("NULL element in array is not allowed");
 			}
 			// Dump array element.
 			char *element = strndup(conf.str + j + 1, k - j - 1);
@@ -326,6 +323,9 @@ k2v3_cache k2v3_parse(char *const _Nonnull buf)
 					}
 					cur = cur->next;
 				}
+				if (strcmp(cur->key, key.key) == 0) {
+					k2v3_error("Duplicate keys are not allowed.");
+				}
 				cur->next = node;
 			}
 		}
@@ -411,17 +411,22 @@ char *k2v3_open_file(char *const _Nonnull path)
 	close(fd);
 	return buf;
 }
-bool k2v3_have_key(k2v3_cache cache, char *const _Nonnull key, enum K2V3_TYPE type)
+int k2v3_have_key(k2v3_cache cache, char *const _Nonnull key, enum K2V3_TYPE type)
 {
+	/*
+	 * 0 for key exists with the expected type.
+	 * 1 for key exists but with different type.
+	 * -1 for key does not exist.
+	 */
 	while (cache != NULL) {
 		if (strcmp(cache->key, key) == 0 && cache->type == type) {
-			return true;
+			return 0;
 		} else if (strcmp(cache->key, key) == 0 && cache->type != type) {
-			k2v3_error("Key '%s' exists but with different type. Expected %s but got %s.", key, type == K2V3_ARRAY ? "array" : "scalar", cache->type == K2V3_ARRAY ? "array" : "scalar");
+			return 1;
 		}
 		cache = cache->next;
 	}
-	return false;
+	return -1;
 }
 
 //
@@ -434,7 +439,8 @@ static k2v3_cache get_key_cache(const char *_Nonnull key, enum K2V3_TYPE type, k
 	while (cache != NULL) {
 		if (strcmp(cache->key, key) == 0) {
 			if (cache->type != type) {
-				k2v3_error("Key '%s' exists but with different type. Expected %s but got %s.", key, type == K2V3_ARRAY ? "array" : "scalar", cache->type == K2V3_ARRAY ? "array" : "scalar");
+				k2v3_warning("Key '%s' exists but with different type. Expected %s but got %s.", key, type == K2V3_ARRAY ? "array" : "scalar", cache->type == K2V3_ARRAY ? "array" : "scalar");
+				return NULL;
 			}
 			return cache;
 		}
