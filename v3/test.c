@@ -8,7 +8,9 @@ int main()
 	printf("\n\n");
 	printf("bool_val: %s\n", k2v3_get_bool("bool_val", cache) ? "true" : "false");
 	printf("int_val: %d\n", k2v3_get_int("int_val", cache));
-	printf("char_val: %s\n", k2v3_get_char("char_val", cache));
+	char *char_val = k2v3_get_char("char_val", cache);
+	printf("char_val: %s\n", char_val);
+	free(char_val);
 	printf("float_val: %f\n", k2v3_get_float("float_val", cache));
 	printf("long_val: %lld\n", k2v3_get_long("long_val", cache));
 	// Get int array.
@@ -42,6 +44,7 @@ int main()
 		if (i < char_array_len - 1) {
 			printf(", ");
 		}
+		free(char_array[i]);
 	}
 	printf("]\n");
 	// Get long array.

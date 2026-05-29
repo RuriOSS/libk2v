@@ -429,213 +429,185 @@ bool k2v3_have_key(k2v3_cache cache, char *const _Nonnull key, enum K2V3_TYPE ty
 // Get values.
 //
 //
-char *k2v3_get_char(const char *_Nonnull key, k2v3_cache cache)
+static k2v3_cache get_key_cache(const char *_Nonnull key, enum K2V3_TYPE type, k2v3_cache cache)
 {
 	while (cache != NULL) {
 		if (strcmp(cache->key, key) == 0) {
-			if (cache->type != K2V3_SCALAR) {
-				k2v3_error("Key '%s' is not a scalar value.", key);
+			if (cache->type != type) {
+				k2v3_error("Key '%s' exists but with different type. Expected %s but got %s.", key, type == K2V3_ARRAY ? "array" : "scalar", cache->type == K2V3_ARRAY ? "array" : "scalar");
 			}
-			if (cache->empty) {
-				return NULL;
-			}
-			return cache->scalar_val;
+			return cache;
 		}
 		cache = cache->next;
 	}
-	k2v3_error("Key '%s' not found.", key);
+	return NULL;
+}
+char *k2v3_get_char(const char *_Nonnull key, k2v3_cache cache)
+{
+	k2v3_cache node = get_key_cache(key, K2V3_SCALAR, cache);
+	if (node == NULL) {
+		k2v3_error("Key '%s' not found.", key);
+	}
+	if (node->empty) {
+		return NULL;
+	}
+	return strdup(node->scalar_val);
 }
 int k2v3_get_int(const char *_Nonnull key, k2v3_cache cache)
 {
-	while (cache != NULL) {
-		if (strcmp(cache->key, key) == 0) {
-			if (cache->type != K2V3_SCALAR) {
-				k2v3_error("Key '%s' is not a scalar value.", key);
-			}
-			if (cache->empty) {
-				k2v3_error("Key '%s' is empty.", key);
-			}
-			char *endptr;
-			long val = strtol(cache->scalar_val, &endptr, 10);
-			if (*endptr != '\0') {
-				k2v3_error("Value for key '%s' is not a valid integer.", key);
-			}
-			return (int)val;
-		}
-		cache = cache->next;
+	k2v3_cache node = get_key_cache(key, K2V3_SCALAR, cache);
+	if (node == NULL) {
+		k2v3_error("Key '%s' not found.", key);
 	}
-	k2v3_error("Key '%s' not found.", key);
+	if (node->empty) {
+		return 0;
+	}
+	char *endptr;
+	long ret = strtol(node->scalar_val, &endptr, 10);
+	if (*endptr != '0') {
+		return 0;
+	}
+	if (ret > INT_MAX) {
+		k2v3_error("Value for key '%s' is too large for int.", key);
+		return 0;
+	}
+	return (int)ret;
 }
 float k2v3_get_float(const char *_Nonnull key, k2v3_cache cache)
 {
-	while (cache != NULL) {
-		if (strcmp(cache->key, key) == 0) {
-			if (cache->type != K2V3_SCALAR) {
-				k2v3_error("Key '%s' is not a scalar value.", key);
-			}
-			if (cache->empty) {
-				k2v3_error("Key '%s' is empty.", key);
-			}
-			char *endptr;
-			float val = strtof(cache->scalar_val, &endptr);
-			if (*endptr != '\0') {
-				k2v3_error("Value for key '%s' is not a valid float.", key);
-			}
-			return val;
-		}
-		cache = cache->next;
+	k2v3_cache node = get_key_cache(key, K2V3_SCALAR, cache);
+	if (node == NULL) {
+		k2v3_error("Key '%s' not found.", key);
 	}
-	k2v3_error("Key '%s' not found.", key);
+	if (node->empty) {
+		return 0;
+	}
+	char *endptr;
+	float val = strtof(node->scalar_val, &endptr);
+	if (*endptr != '\0') {
+		k2v3_error("Value for key '%s' is not a valid float.", key);
+	}
+	return val;
 }
 bool k2v3_get_bool(const char *_Nonnull key, k2v3_cache cache)
 {
-	while (cache != NULL) {
-		if (strcmp(cache->key, key) == 0) {
-			if (cache->type != K2V3_SCALAR) {
-				k2v3_error("Key '%s' is not a scalar value.", key);
-			}
-			if (cache->empty) {
-				k2v3_error("Key '%s' is empty.", key);
-			}
-			if (strcmp(cache->scalar_val, "true") == 0) {
-				return true;
-			}
-			if (strcmp(cache->scalar_val, "false") == 0) {
-				return false;
-			}
-			k2v3_error("Value for key '%s' is not a valid boolean.", key);
-		}
-		cache = cache->next;
+	k2v3_cache node = get_key_cache(key, K2V3_SCALAR, cache);
+	if (node == NULL) {
+		k2v3_error("Key '%s' not found.", key);
 	}
-	k2v3_error("Key '%s' not found.", key);
+	if (node->empty) {
+		k2v3_error("Key '%s' is empty.", key);
+	}
+	if (strcmp(node->scalar_val, "true") == 0) {
+		return true;
+	} else if (strcmp(node->scalar_val, "false") == 0) {
+		return false;
+	} else {
+		k2v3_error("Value for key '%s' is not a valid boolean. Expected 'true' or 'false' but got '%s'.", key, node->scalar_val);
+	}
 }
 long long k2v3_get_long(const char *_Nonnull key, k2v3_cache cache)
 {
-	while (cache != NULL) {
-		if (strcmp(cache->key, key) == 0) {
-			if (cache->type != K2V3_SCALAR) {
-				k2v3_error("Key '%s' is not a scalar value.", key);
-			}
-			if (cache->empty) {
-				k2v3_error("Key '%s' is empty.", key);
-			}
-			char *endptr;
-			long long val = strtoll(cache->scalar_val, &endptr, 10);
-			if (*endptr != '\0') {
-				k2v3_error("Value for key '%s' is not a valid long integer.", key);
-			}
-			return val;
-		}
-		cache = cache->next;
+	k2v3_cache node = get_key_cache(key, K2V3_SCALAR, cache);
+	if (node == NULL) {
+		k2v3_error("Key '%s' not found.", key);
 	}
-	k2v3_error("Key '%s' not found.", key);
+	if (node->empty) {
+		return 0;
+	}
+	char *endptr;
+	long long ret = strtoll(node->scalar_val, &endptr, 10);
+	if (*endptr != '\0') {
+		k2v3_error("Value for key '%s' is not a valid long integer.", key);
+	}
+	return ret;
 }
 int k2v3_get_int_array(const char *_Nonnull key, k2v3_cache cache, int *_Nonnull array, int limit)
 {
-	while (cache != NULL) {
-		if (strcmp(cache->key, key) == 0) {
-			if (cache->type != K2V3_ARRAY) {
-				k2v3_error("Key '%s' is not an array value.", key);
-			}
-			if (cache->empty) {
-				return 0;
-			}
-			if (cache->array_len > (size_t)limit) {
-				k2v3_error("Array length for key '%s' exceeds the limit of %d.", key, limit);
-			}
-			int count = 0;
-			for (size_t i = 0; i < cache->array_len; i++) {
-				char *endptr;
-				long val = strtol(cache->array_val[i], &endptr, 10);
-				if (*endptr != '\0') {
-					k2v3_error("Value '%s' in array for key '%s' is not a valid integer.", cache->array_val[i], key);
-				}
-				array[count++] = (int)val;
-			}
-			return count;
-		}
-		cache = cache->next;
+	k2v3_cache node = get_key_cache(key, K2V3_ARRAY, cache);
+	if (node == NULL) {
+		k2v3_error("Key '%s' not found.", key);
 	}
-	k2v3_error("Key '%s' not found.", key);
+	if (node->empty) {
+		return 0;
+	}
+	if (node->array_len > (size_t)limit) {
+		k2v3_error("Array length for key '%s' exceeds the limit of %d.", key, limit);
+	}
+	int count = 0;
+	for (size_t i = 0; i < node->array_len; i++) {
+		char *endptr;
+		long long val = strtoll(node->array_val[i], &endptr, 10);
+		if (*endptr != '\0') {
+			k2v3_error("Value '%s' in array for key '%s' is not a valid long integer.", node->array_val[i], key);
+		}
+		array[count++] = (int)val;
+	}
+	return count;
 }
 int k2v3_get_char_array(const char *_Nonnull key, k2v3_cache cache, char *_Nonnull array[], int limit)
 {
-	while (cache != NULL) {
-		if (strcmp(cache->key, key) == 0) {
-			if (cache->type != K2V3_ARRAY) {
-				k2v3_error("Key '%s' is not an array value.", key);
-			}
-			if (cache->empty) {
-				return 0;
-			}
-			if (cache->array_len > (size_t)limit) {
-				k2v3_error("Array length for key '%s' exceeds the limit of %d.", key, limit);
-			}
-			int count = 0;
-			for (size_t i = 0; i < cache->array_len; i++) {
-				array[count++] = cache->array_val[i];
-			}
-			return count;
-		}
-		cache = cache->next;
+	k2v3_cache node = get_key_cache(key, K2V3_ARRAY, cache);
+	if (node == NULL) {
+		k2v3_error("Key '%s' not found.", key);
 	}
-	k2v3_error("Key '%s' not found.", key);
+	if (node->empty) {
+		return 0;
+	}
+	if (node->array_len > (size_t)limit) {
+		k2v3_error("Array length for key '%s' exceeds the limit of %d.", key, limit);
+	}
+	int count = 0;
+	for (size_t i = 0; i < node->array_len; i++) {
+		array[count++] = strdup(node->array_val[i]);
+	}
+	return count;
 }
 int k2v3_get_float_array(const char *_Nonnull key, k2v3_cache cache, float *_Nonnull array, int limit)
 {
-	while (cache != NULL) {
-		if (strcmp(cache->key, key) == 0) {
-			if (cache->type != K2V3_ARRAY) {
-				k2v3_error("Key '%s' is not an array value.", key);
-			}
-			if (cache->empty) {
-				return 0;
-			}
-			if (cache->array_len > (size_t)limit) {
-				k2v3_error("Array length for key '%s' exceeds the limit of %d.", key, limit);
-			}
-			int count = 0;
-			for (size_t i = 0; i < cache->array_len; i++) {
-				char *endptr;
-				float val = strtof(cache->array_val[i], &endptr);
-				if (*endptr != '\0') {
-					k2v3_error("Value '%s' in array for key '%s' is not a valid float.", cache->array_val[i], key);
-				}
-				array[count++] = val;
-			}
-			return count;
-		}
-		cache = cache->next;
+	k2v3_cache node = get_key_cache(key, K2V3_ARRAY, cache);
+	if (node == NULL) {
+		k2v3_error("Key '%s' not found.", key);
 	}
-	k2v3_error("Key '%s' not found.", key);
+	if (node->empty) {
+		return 0;
+	}
+	if (node->array_len > (size_t)limit) {
+		k2v3_error("Array length for key '%s' exceeds the limit of %d.", key, limit);
+	}
+	int count = 0;
+	for (size_t i = 0; i < node->array_len; i++) {
+		char *endptr;
+		float val = strtof(node->array_val[i], &endptr);
+		if (*endptr != '\0') {
+			k2v3_error("Value '%s' in array for key '%s' is not a valid float.", node->array_val[i], key);
+		}
+		array[count++] = val;
+	}
+	return count;
 }
 int k2v3_get_long_array(const char *_Nonnull key, k2v3_cache cache, long long *_Nonnull array, int limit)
 {
-	while (cache != NULL) {
-		if (strcmp(cache->key, key) == 0) {
-			if (cache->type != K2V3_ARRAY) {
-				k2v3_error("Key '%s' is not an array value.", key);
-			}
-			if (cache->empty) {
-				return 0;
-			}
-			if (cache->array_len > (size_t)limit) {
-				k2v3_error("Array length for key '%s' exceeds the limit of %d.", key, limit);
-			}
-			int count = 0;
-			for (size_t i = 0; i < cache->array_len; i++) {
-				char *endptr;
-				long long val = strtoll(cache->array_val[i], &endptr, 10);
-				if (*endptr != '\0') {
-					k2v3_error("Value '%s' in array for key '%s' is not a valid long integer.", cache->array_val[i], key);
-				}
-				array[count++] = val;
-			}
-			return count;
-		}
-		cache = cache->next;
+	k2v3_cache node = get_key_cache(key, K2V3_ARRAY, cache);
+	if (node == NULL) {
+		k2v3_error("Key '%s' not found.", key);
 	}
-	k2v3_error("Key '%s' not found.", key);
+	if (node->empty) {
+		return 0;
+	}
+	if (node->array_len > (size_t)limit) {
+		k2v3_error("Array length for key '%s' exceeds the limit of %d.", key, limit);
+	}
+	int count = 0;
+	for (size_t i = 0; i < node->array_len; i++) {
+		char *endptr;
+		long long val = strtoll(node->array_val[i], &endptr, 10);
+		if (*endptr != '\0') {
+			k2v3_error("Value '%s' in array for key '%s' is not a valid long integer.", node->array_val[i], key);
+		}
+		array[count++] = val;
+	}
+	return count;
 }
 
 //
