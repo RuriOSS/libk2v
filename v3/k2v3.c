@@ -480,7 +480,7 @@ int k2v3_get_int(const char *_Nonnull key, k2v3_cache cache)
 	if (*endptr != '\0') {
 		return 0;
 	}
-	if (ret > INT_MAX) {
+	if (ret > INT_MAX || ret < INT_MIN) {
 		k2v3_error("Value for key '%s' is too large for int.", key);
 		return 0;
 	}
@@ -554,7 +554,7 @@ int k2v3_get_int_array(const char *_Nonnull key, k2v3_cache cache, int *_Nonnull
 		if (*endptr != '\0') {
 			k2v3_error("Value '%s' in array for key '%s' is not a valid integer.", node->array_val[i], key);
 		}
-		if (val > INT_MAX) {
+		if (val > INT_MAX || val < INT_MIN) {
 			k2v3_error("Value '%s' in array for key '%s' is too large for int.", node->array_val[i], key);
 		}
 		array[count++] = (int)val;
