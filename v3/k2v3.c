@@ -102,6 +102,7 @@ static struct K2V3_VALUE get_value(struct K2V3_STRING conf)
 	if (conf.len == 0) {
 		k2v3_error("Value cannot be empty.");
 	}
+	bool priv_backslash = false;
 	// We allow `[]` for null array, `""` for null scalar.
 	if (conf.len >= 2) {
 		if (conf.str[0] == '"' && conf.str[1] == '"') {
@@ -114,7 +115,7 @@ static struct K2V3_VALUE get_value(struct K2V3_STRING conf)
 		if (conf.str[0] == '[') {
 			// skip spaces after `[`.
 			size_t spaces = 0;
-			while (spaces + 1 < conf.len && conf.str[spaces + 1] == ' ') {
+			while (spaces + 1 < conf.len && (conf.str[spaces + 1] == ' ' || conf.str[spaces + 1] == '\n')) {
 				spaces++;
 			}
 			if (spaces + 1 < conf.len && conf.str[spaces + 1] == ']') {
@@ -139,7 +140,12 @@ static struct K2V3_VALUE get_value(struct K2V3_STRING conf)
 		}
 		size_t i = 1;
 		while (i < conf.len) {
-			if (conf.str[i] == '"' && conf.str[i - 1] != '\\') {
+			if (conf.str[i] == '\\' && !priv_backslash) {
+				priv_backslash = true;
+			} else {
+				priv_backslash = false;
+			}
+			if (conf.str[i] == '"' && !priv_backslash) {
 				break;
 			}
 			if (i >= boundary) {
@@ -179,16 +185,23 @@ static struct K2V3_VALUE get_value(struct K2V3_STRING conf)
 		ret.jmp = i + 1;
 	} else if (conf.str[0] == '[') {
 		ret.type = K2V3_ARRAY;
+		priv_backslash = false;
 		// Array value.
 		// Boundry is next excepted `]` character that is not escaped.
 		// Newline is allowed in array values, so we do not consider newline as boundary here.
 		size_t i = 1;
 		while (i < conf.len) {
-			if (conf.str[i] == ']' && conf.str[i - 1] != '\\') {
+			if (conf.str[i] == '\\' && !priv_backslash) {
+				priv_backslash = true;
+			} else {
+				priv_backslash = false;
+			}
+			if (conf.str[i] == ']' && !priv_backslash) {
 				break;
 			}
 			i++;
 		}
+		priv_backslash = false;
 		if (i >= conf.len) {
 			k2v3_warning("Unterminated array value.");
 			ret.type = K2V3_SCALAR;
@@ -236,7 +249,12 @@ static struct K2V3_VALUE get_value(struct K2V3_STRING conf)
 			// Get the next unescaped `"` character.
 			size_t k = j + 1;
 			while (k < i) {
-				if (conf.str[k] == '"' && conf.str[k - 1] != '\\') {
+				if (conf.str[k] == '\\' && !priv_backslash) {
+					priv_backslash = true;
+				} else {
+					priv_backslash = false;
+				}
+				if (conf.str[k] == '"' && !priv_backslash) {
 					break;
 				}
 				if (k >= i - 1) {
@@ -258,6 +276,7 @@ static struct K2V3_VALUE get_value(struct K2V3_STRING conf)
 				}
 				k++;
 			}
+			priv_backslash = false;
 			// Do not allow null elements, so k-j-1 should >0.
 			if (k - j - 1 <= 0) {
 				k2v3_warning("NULL element in array is not allowed");
@@ -323,7 +342,7 @@ static struct K2V3_VALUE get_value(struct K2V3_STRING conf)
 					free(array_val);
 					// Goto next line or end of string.
 					ret.jmp = i + 1;
-					return ret;
+					goto end;
 				}
 			} else {
 				// If there is no separator, it should be the end of array.
