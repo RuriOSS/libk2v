@@ -151,6 +151,8 @@ static struct K2V3_VALUE get_value(struct K2V3_STRING conf)
 			if (i >= boundary) {
 				k2v3_warning("Unterminated scalar value.");
 				ret.type = K2V3_SCALAR;
+				free(ret.scalar_val);
+				ret.scalar_val = NULL;
 				ret.empty = true;
 				// Goto next line or end of string.
 				char *newline = memchr(conf.str, '\n', conf.len);
@@ -302,7 +304,7 @@ static struct K2V3_VALUE get_value(struct K2V3_STRING conf)
 				ret.type = K2V3_SCALAR;
 				ret.empty = true;
 				// Goto next line or end of string.
-				char *newline = memchr(conf.str, '\n', conf.len);
+				char *newline = memchr(conf.str + ret.jmp, '\n', conf.len - ret.jmp);
 				if (newline) {
 					ret.jmp = (size_t)(newline - conf.str) + 1;
 				} else {
@@ -355,7 +357,7 @@ static struct K2V3_VALUE get_value(struct K2V3_STRING conf)
 					}
 					free(array_val);
 					// Goto next line or end of string.
-					char *newline = memchr(conf.str, '\n', conf.len);
+					char *newline = memchr(conf.str + ret.jmp, '\n', conf.len - ret.jmp);
 					if (newline) {
 						ret.jmp = (size_t)(newline - conf.str) + 1;
 					} else {
@@ -372,6 +374,8 @@ static struct K2V3_VALUE get_value(struct K2V3_STRING conf)
 	} else {
 		k2v3_warning("Value must start with '\"' for scalar or '[' for array.");
 		ret.type = K2V3_SCALAR;
+		free(ret.scalar_val);
+		ret.scalar_val = NULL;
 		ret.empty = true;
 		// Goto next line or end of string.
 		char *newline = memchr(conf.str, '\n', conf.len);
@@ -530,7 +534,7 @@ k2v3_cache k2v3_parse(char *const _Nonnull buf)
 					}
 					free(node);
 					free(key.key);
-					return ret;
+					node = NULL;
 				}
 				cur->next = node;
 			}
