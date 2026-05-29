@@ -516,25 +516,28 @@ k2v3_cache k2v3_parse(char *const _Nonnull buf)
 						}
 						free(node);
 						free(key.key);
+						node = NULL;
 						break;
 					}
 					cur = cur->next;
 				}
-				if (strcmp(cur->key, key.key) == 0) {
-					k2v3_warning("Duplicate keys are not allowed.");
-					if (node->type == K2V3_ARRAY) {
-						for (size_t i = 0; i < node->array_len; i++) {
-							free(node->array_val[i]);
+				if (node) {
+					if (strcmp(cur->key, key.key) == 0) {
+						k2v3_warning("Duplicate keys are not allowed.");
+						if (node->type == K2V3_ARRAY) {
+							for (size_t i = 0; i < node->array_len; i++) {
+								free(node->array_val[i]);
+							}
+							free(node->array_val);
+						} else {
+							free(node->scalar_val);
 						}
-						free(node->array_val);
-					} else {
-						free(node->scalar_val);
+						free(node);
+						free(key.key);
+						node = NULL;
 					}
-					free(node);
-					free(key.key);
-					node = NULL;
+					cur->next = node;
 				}
-				cur->next = node;
 			}
 		}
 	}
