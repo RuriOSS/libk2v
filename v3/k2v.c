@@ -34,6 +34,12 @@
  * USERS SHOULD BE RESPONSIBLE FOR THE INPUT.
  * SECURITY IS THE MOST IMPORTANT THING, SO WE DO NOT ALLOW ANY UNEXPECTED INPUTS.
  */
+
+//
+//
+// Parse into cache.
+//
+//
 struct K2V3_STRING {
 	char *str;
 	size_t len;
@@ -405,13 +411,473 @@ char *k2v3_open_file(char *const _Nonnull path)
 	close(fd);
 	return buf;
 }
-bool k2v3_have_key(k2v3_cache cache, char *const _Nonnull key)
+bool k2v3_have_key(k2v3_cache cache, char *const _Nonnull key, enum K2V3_TYPE type)
 {
 	while (cache != NULL) {
-		if (strcmp(cache->key, key) == 0) {
+		if (strcmp(cache->key, key) == 0 && cache->type == type) {
 			return true;
+		} else if (strcmp(cache->key, key) == 0 && cache->type != type) {
+			k2v3_error("Key '%s' exists but with different type. Expected %s but got %s.", key, type == K2V3_ARRAY ? "array" : "scalar", cache->type == K2V3_ARRAY ? "array" : "scalar");
 		}
 		cache = cache->next;
 	}
 	return false;
+}
+
+//
+//
+// Get values.
+//
+//
+char *k2v3_get_char(const char *_Nonnull key, k2v3_cache cache)
+{
+	while (cache != NULL) {
+		if (strcmp(cache->key, key) == 0) {
+			if (cache->type != K2V3_SCALAR) {
+				k2v3_error("Key '%s' is not a scalar value.", key);
+			}
+			if (cache->empty) {
+				return NULL;
+			}
+			return cache->scalar_val;
+		}
+		cache = cache->next;
+	}
+	k2v3_error("Key '%s' not found.", key);
+}
+int k2v3_get_int(const char *_Nonnull key, k2v3_cache cache)
+{
+	while (cache != NULL) {
+		if (strcmp(cache->key, key) == 0) {
+			if (cache->type != K2V3_SCALAR) {
+				k2v3_error("Key '%s' is not a scalar value.", key);
+			}
+			if (cache->empty) {
+				k2v3_error("Key '%s' is empty.", key);
+			}
+			char *endptr;
+			long val = strtol(cache->scalar_val, &endptr, 10);
+			if (*endptr != '\0') {
+				k2v3_error("Value for key '%s' is not a valid integer.", key);
+			}
+			return (int)val;
+		}
+		cache = cache->next;
+	}
+	k2v3_error("Key '%s' not found.", key);
+}
+float k2v3_get_float(const char *_Nonnull key, k2v3_cache cache)
+{
+	while (cache != NULL) {
+		if (strcmp(cache->key, key) == 0) {
+			if (cache->type != K2V3_SCALAR) {
+				k2v3_error("Key '%s' is not a scalar value.", key);
+			}
+			if (cache->empty) {
+				k2v3_error("Key '%s' is empty.", key);
+			}
+			char *endptr;
+			float val = strtof(cache->scalar_val, &endptr);
+			if (*endptr != '\0') {
+				k2v3_error("Value for key '%s' is not a valid float.", key);
+			}
+			return val;
+		}
+		cache = cache->next;
+	}
+	k2v3_error("Key '%s' not found.", key);
+}
+bool k2v3_get_bool(const char *_Nonnull key, k2v3_cache cache)
+{
+	while (cache != NULL) {
+		if (strcmp(cache->key, key) == 0) {
+			if (cache->type != K2V3_SCALAR) {
+				k2v3_error("Key '%s' is not a scalar value.", key);
+			}
+			if (cache->empty) {
+				k2v3_error("Key '%s' is empty.", key);
+			}
+			if (strcmp(cache->scalar_val, "true") == 0) {
+				return true;
+			}
+			if (strcmp(cache->scalar_val, "false") == 0) {
+				return false;
+			}
+			k2v3_error("Value for key '%s' is not a valid boolean.", key);
+		}
+		cache = cache->next;
+	}
+	k2v3_error("Key '%s' not found.", key);
+}
+long long k2v3_get_long(const char *_Nonnull key, k2v3_cache cache)
+{
+	while (cache != NULL) {
+		if (strcmp(cache->key, key) == 0) {
+			if (cache->type != K2V3_SCALAR) {
+				k2v3_error("Key '%s' is not a scalar value.", key);
+			}
+			if (cache->empty) {
+				k2v3_error("Key '%s' is empty.", key);
+			}
+			char *endptr;
+			long long val = strtoll(cache->scalar_val, &endptr, 10);
+			if (*endptr != '\0') {
+				k2v3_error("Value for key '%s' is not a valid long integer.", key);
+			}
+			return val;
+		}
+		cache = cache->next;
+	}
+	k2v3_error("Key '%s' not found.", key);
+}
+int k2v3_get_int_array(const char *_Nonnull key, k2v3_cache cache, int *_Nonnull array, int limit)
+{
+	while (cache != NULL) {
+		if (strcmp(cache->key, key) == 0) {
+			if (cache->type != K2V3_ARRAY) {
+				k2v3_error("Key '%s' is not an array value.", key);
+			}
+			if (cache->empty) {
+				return 0;
+			}
+			if (cache->array_len > (size_t)limit) {
+				k2v3_error("Array length for key '%s' exceeds the limit of %d.", key, limit);
+			}
+			int count = 0;
+			for (size_t i = 0; i < cache->array_len; i++) {
+				char *endptr;
+				long val = strtol(cache->array_val[i], &endptr, 10);
+				if (*endptr != '\0') {
+					k2v3_error("Value '%s' in array for key '%s' is not a valid integer.", cache->array_val[i], key);
+				}
+				array[count++] = (int)val;
+			}
+			return count;
+		}
+		cache = cache->next;
+	}
+	k2v3_error("Key '%s' not found.", key);
+}
+int k2v3_get_char_array(const char *_Nonnull key, k2v3_cache cache, char *_Nonnull array[], int limit)
+{
+	while (cache != NULL) {
+		if (strcmp(cache->key, key) == 0) {
+			if (cache->type != K2V3_ARRAY) {
+				k2v3_error("Key '%s' is not an array value.", key);
+			}
+			if (cache->empty) {
+				return 0;
+			}
+			if (cache->array_len > (size_t)limit) {
+				k2v3_error("Array length for key '%s' exceeds the limit of %d.", key, limit);
+			}
+			int count = 0;
+			for (size_t i = 0; i < cache->array_len; i++) {
+				array[count++] = cache->array_val[i];
+			}
+			return count;
+		}
+		cache = cache->next;
+	}
+	k2v3_error("Key '%s' not found.", key);
+}
+int k2v3_get_float_array(const char *_Nonnull key, k2v3_cache cache, float *_Nonnull array, int limit)
+{
+	while (cache != NULL) {
+		if (strcmp(cache->key, key) == 0) {
+			if (cache->type != K2V3_ARRAY) {
+				k2v3_error("Key '%s' is not an array value.", key);
+			}
+			if (cache->empty) {
+				return 0;
+			}
+			if (cache->array_len > (size_t)limit) {
+				k2v3_error("Array length for key '%s' exceeds the limit of %d.", key, limit);
+			}
+			int count = 0;
+			for (size_t i = 0; i < cache->array_len; i++) {
+				char *endptr;
+				float val = strtof(cache->array_val[i], &endptr);
+				if (*endptr != '\0') {
+					k2v3_error("Value '%s' in array for key '%s' is not a valid float.", cache->array_val[i], key);
+				}
+				array[count++] = val;
+			}
+			return count;
+		}
+		cache = cache->next;
+	}
+	k2v3_error("Key '%s' not found.", key);
+}
+int k2v3_get_long_array(const char *_Nonnull key, k2v3_cache cache, long long *_Nonnull array, int limit)
+{
+	while (cache != NULL) {
+		if (strcmp(cache->key, key) == 0) {
+			if (cache->type != K2V3_ARRAY) {
+				k2v3_error("Key '%s' is not an array value.", key);
+			}
+			if (cache->empty) {
+				return 0;
+			}
+			if (cache->array_len > (size_t)limit) {
+				k2v3_error("Array length for key '%s' exceeds the limit of %d.", key, limit);
+			}
+			int count = 0;
+			for (size_t i = 0; i < cache->array_len; i++) {
+				char *endptr;
+				long long val = strtoll(cache->array_val[i], &endptr, 10);
+				if (*endptr != '\0') {
+					k2v3_error("Value '%s' in array for key '%s' is not a valid long integer.", cache->array_val[i], key);
+				}
+				array[count++] = val;
+			}
+			return count;
+		}
+		cache = cache->next;
+	}
+	k2v3_error("Key '%s' not found.", key);
+}
+
+//
+//
+// Generation functions.
+//
+//
+
+char *k2v3_add_comment(char *_Nonnull buf, char *_Nonnull comment)
+{
+	size_t buf_len = (buf != NULL) ? strlen(buf) : 0;
+	size_t comment_len = strlen(comment);
+	size_t total_size = buf_len + comment_len + 5; // "# " + "\n" + '\0'
+
+	char *ret = malloc(total_size);
+	if (!ret) {
+		return NULL;
+	}
+
+	if (buf != NULL) {
+		snprintf(ret, total_size, "%s# %s\n", buf, comment);
+	} else {
+		snprintf(ret, total_size, "# %s\n", comment);
+	}
+	free(buf);
+	return ret;
+}
+char *k2v3_add_newline(char *_Nonnull buf)
+{
+	size_t buf_len = (buf != NULL) ? strlen(buf) : 0;
+	size_t total_size = buf_len + 2; // "\n" + '\0'
+
+	char *ret = malloc(total_size);
+	if (!ret) {
+		return NULL;
+	}
+
+	if (buf != NULL) {
+		snprintf(ret, total_size, "%s\n", buf);
+	} else {
+		snprintf(ret, total_size, "\n");
+	}
+	free(buf);
+	return ret;
+}
+char *k2v3_add_config_func(char *_Nullable buf, char *_Nonnull tmp)
+{
+	size_t size = 4;
+	if (buf != NULL) {
+		size += strlen(buf);
+	}
+	size += strlen(tmp) + 4;
+	char *ret = malloc(size);
+	if (buf != NULL) {
+		sprintf(ret, "%s%s", buf, tmp);
+	} else {
+		sprintf(ret, "%s", tmp);
+	}
+	free(buf);
+	free(tmp);
+	return ret;
+}
+char *char_to_k2v3(const char *_Nonnull key, const char *_Nonnull val)
+{
+	if (key == NULL) {
+		return NULL;
+	}
+	size_t key_len = strlen(key);
+	size_t val_len = val ? strlen(val) : 0;
+	size_t total_size = key_len + val_len + 5; // ="\"\n\0"
+
+	char *ret = malloc(total_size);
+	if (!ret) {
+		return NULL;
+	}
+
+	if (val != NULL) {
+		snprintf(ret, total_size, "%s=\"%s\"\n", key, val);
+	} else {
+		snprintf(ret, total_size, "%s=\"\"\n", key);
+	}
+	return ret;
+}
+char *int_to_k2v3(const char *_Nonnull key, int val)
+{
+	if (key == NULL) {
+		return NULL;
+	}
+	size_t max_len = strlen(key) + 32; // Safe upper bound for integer
+	char *ret = malloc(max_len);
+	if (ret) {
+		snprintf(ret, max_len, "%s=\"%d\"\n", key, val);
+	}
+	return ret;
+}
+char *long_to_k2v3(const char *_Nonnull key, long val)
+{
+	if (key == NULL) {
+		return NULL;
+	}
+	size_t max_len = strlen(key) + 64; // Safe upper bound for long
+	char *ret = malloc(max_len);
+	if (ret) {
+		snprintf(ret, max_len, "%s=\"%ld\"\n", key, val);
+	}
+	return ret;
+}
+char *bool_to_k2v3(const char *_Nonnull key, bool val)
+{
+	// NULL check.
+	if (key == NULL) {
+		return NULL;
+	}
+	char *ret = malloc(strlen(key) + 8 + 8);
+	sprintf(ret, "%s=\"%s\"\n", key, val ? "true" : "false");
+	return ret;
+}
+char *float_to_k2v3(const char *_Nonnull key, float val)
+{
+	// NULL check.
+	if (key == NULL) {
+		return NULL;
+	}
+	char *buf = malloc(strlen(key) + 400 + 8);
+	sprintf(buf, "%s=\"%f\"\n", key, val);
+	char *ret = strdup(buf);
+	free(buf);
+	return ret;
+}
+char *char_array_to_k2v3(const char *_Nonnull key, char *const *_Nonnull val, int len)
+{
+	if (key == NULL) {
+		return NULL;
+	}
+
+	if (len == 0 || val == NULL) {
+		size_t size = strlen(key) + 5; // =[]\n\0
+		char *ret = malloc(size);
+		if (ret) {
+			snprintf(ret, size, "%s=[]\n", key);
+		}
+		return ret;
+	}
+
+	size_t total_size = strlen(key) + 5; // key + =[\n + \0
+	for (int i = 0; i < len; i++) {
+		total_size += strlen(val[i]) + 2; // ""
+		if (i != len - 1) {
+			total_size += 1; // ,
+		}
+	}
+
+	char *buf = malloc(total_size);
+	if (!buf) {
+		return NULL;
+	}
+
+	char *ptr = buf;
+	ptr += sprintf(ptr, "%s=[", key);
+
+	for (int i = 0; i < len; i++) {
+		ptr += sprintf(ptr, "\"%s\"", val[i]);
+		if (i != len - 1) {
+			*ptr++ = ',';
+		}
+	}
+
+	*ptr++ = ']';
+	*ptr++ = '\n';
+	*ptr = '\0';
+
+	return buf;
+}
+char *int_array_to_k2v3(const char *_Nonnull key, int *_Nonnull val, int len)
+{
+	if (key == NULL) {
+		return NULL;
+	}
+	if (len == 0 || val == NULL) {
+		size_t size = strlen(key) + 5;
+		char *ret = malloc(size);
+		if (ret) {
+			snprintf(ret, size, "%s=[]\n", key);
+		}
+		return ret;
+	}
+
+	size_t max_size = strlen(key) + ((size_t)len * 32) + 5; // 32 per int + padding
+	char *buf = malloc(max_size);
+	if (!buf) {
+		return NULL;
+	}
+
+	char *ptr = buf;
+	ptr += sprintf(ptr, "%s=[", key);
+
+	for (int i = 0; i < len; i++) {
+		ptr += sprintf(ptr, "\"%d\"", val[i]);
+		if (i != len - 1) {
+			*ptr++ = ',';
+		}
+	}
+
+	*ptr++ = ']';
+	*ptr++ = '\n';
+	*ptr = '\0';
+
+	return buf;
+}
+char *float_array_to_k2v3(const char *_Nonnull key, float *_Nonnull val, int len)
+{
+	if (key == NULL) {
+		return NULL;
+	}
+	if (len == 0 || val == NULL) {
+		size_t size = strlen(key) + 5;
+		char *ret = malloc(size);
+		if (ret) {
+			snprintf(ret, size, "%s=[]\n", key);
+		}
+		return ret;
+	}
+
+	size_t max_size = strlen(key) + ((size_t)len * 64) + 5; // 64 per float + padding
+	char *buf = malloc(max_size);
+	if (!buf) {
+		return NULL;
+	}
+
+	char *ptr = buf;
+	ptr += sprintf(ptr, "%s=[", key);
+
+	for (int i = 0; i < len; i++) {
+		ptr += sprintf(ptr, "\"%f\"", (double)val[i]);
+		if (i != len - 1) {
+			*ptr++ = ',';
+		}
+	}
+
+	*ptr++ = ']';
+	*ptr++ = '\n';
+	*ptr = '\0';
+
+	return buf;
 }

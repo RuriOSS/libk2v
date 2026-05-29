@@ -76,17 +76,40 @@ struct K2V3_BUF {
 };
 typedef struct K2V3_BUF *k2v3_cache;
 
-#define k2v3_error(...)                                                                              \
-	do {                                                                                         \
-		fprintf(stderr, "[libk2v3]: in %s() at %s line %d :", __func__, __FILE__, __LINE__); \
-		fprintf(stderr, __VA_ARGS__);                                                        \
-		fprintf(stderr, "\n");                                                               \
-		exit(114);                                                                           \
+#define k2v3_error(...)                                                                             \
+	do {                                                                                        \
+		fprintf(stderr, "[libk2v]: in %s() at %s line %d :", __func__, __FILE__, __LINE__); \
+		fprintf(stderr, __VA_ARGS__);                                                       \
+		fprintf(stderr, "\n");                                                              \
+		exit(114);                                                                          \
 	} while (0)
 
 k2v3_cache k2v3_parse(char *const _Nonnull buf);
 void k2v3_free_cache(k2v3_cache *cache);
 char *k2v3_open_file(char *const _Nonnull path);
+bool k2v3_have_key(k2v3_cache cache, char *const _Nonnull key, enum K2V3_TYPE type);
+char *k2v3_get_char(const char *_Nonnull key, k2v3_cache cache);
+int k2v3_get_int(const char *_Nonnull key, k2v3_cache cache);
+float k2v3_get_float(const char *_Nonnull key, k2v3_cache cache);
+bool k2v3_get_bool(const char *_Nonnull key, k2v3_cache cache);
+long long k2v3_get_long(const char *_Nonnull key, k2v3_cache cache);
+int k2v3_get_int_array(const char *_Nonnull key, k2v3_cache cache, int *_Nonnull array, int limit);
+int k2v3_get_char_array(const char *_Nonnull key, k2v3_cache cache, char *_Nonnull array[], int limit);
+int k2v3_get_float_array(const char *_Nonnull key, k2v3_cache cache, float *_Nonnull array, int limit);
+int k2v3_get_long_array(const char *_Nonnull key, k2v3_cache cache, long long *_Nonnull array, int limit);
+#define k2v3_get(type, ...) k2v3_get_##type(__VA_ARGS__)
 // For debugging.
 void k2v3_dump(k2v3_cache cache);
-bool k2v3_have_key(k2v3_cache cache, char *const _Nonnull key);
+// Generation functions.
+char *k2v3_add_comment(char *_Nullable buf, char *_Nonnull comment);
+char *k2v3_add_newline(char *_Nullable buf);
+char *char_to_k2v3(const char *_Nonnull key, const char *val);
+char *int_to_k2v3(const char *_Nonnull key, int val);
+char *bool_to_k2v3(const char *_Nonnull key, bool val);
+char *float_to_k2v3(const char *_Nonnull key, float val);
+char *long_to_k2v3(const char *_Nonnull key, long val);
+char *char_array_to_k2v3(const char *_Nonnull key, char *const *_Nonnull val, int len);
+char *int_array_to_k2v3(const char *_Nonnull key, int *_Nonnull val, int len);
+char *float_array_to_k2v3(const char *_Nonnull key, float *_Nonnull val, int len);
+char *k2v3_add_config_func(char *_Nullable buf, char *_Nonnull tmp);
+#define k2v3_add_config(type, __k2v3_buf, ...) k2v3_add_config_func(__k2v3_buf, type##_to_k2v3(__VA_ARGS__))
