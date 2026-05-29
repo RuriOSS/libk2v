@@ -77,15 +77,14 @@ static char *correct_backslash(char *buf)
 					ret[j] = buf[i];
 				}
 				j++;
-				ret[j] = '\0';
 				continue;
 			}
 		}
 		ret[j] = buf[i];
 		j++;
-		ret[j] = '\0';
 	}
 	free(buf);
+	ret[j] = '\0';
 	return ret;
 }
 struct K2V3_STRING {
