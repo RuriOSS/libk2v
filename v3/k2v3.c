@@ -28,13 +28,8 @@
  *
  */
 #include "k2v3.h"
-/*
- * WARNING:
- * NO ANY FALLBACKS, JUST PANIC ON ANY ERROR.
- * USERS SHOULD BE RESPONSIBLE FOR THE INPUT.
- * SECURITY IS THE MOST IMPORTANT THING, SO WE DO NOT ALLOW ANY UNEXPECTED INPUTS.
- */
-
+bool k2v_stop_at_warning = false;
+bool k2v_show_warning = true;
 //
 //
 // Parse into cache.
@@ -114,7 +109,7 @@ static struct K2V3_VALUE get_value(struct K2V3_STRING conf)
 			ret.scalar_val = NULL;
 			ret.jmp = 2;
 			ret.empty = true;
-			return ret;
+			goto end;
 		}
 		if (conf.str[0] == '[') {
 			// skip spaces after `[`.
@@ -128,7 +123,7 @@ static struct K2V3_VALUE get_value(struct K2V3_STRING conf)
 				ret.array_val = NULL;
 				ret.jmp = spaces + 2;
 				ret.empty = true;
-				return ret;
+				goto end;
 			}
 		}
 	}
@@ -214,6 +209,10 @@ static struct K2V3_VALUE get_value(struct K2V3_STRING conf)
 		char **array_val = NULL;
 		size_t j = 1;
 		while (j < i) {
+			// Skip spaces before the element.
+			while (j < i && (conf.str[j] == ' ' || conf.str[j] == '\n')) {
+				j++;
+			}
 			// First is `"`.
 			if (conf.str[j] != '"') {
 				k2v3_warning("Array elements must start with '\"'.");
@@ -363,6 +362,20 @@ static struct K2V3_VALUE get_value(struct K2V3_STRING conf)
 			ret.jmp = conf.len;
 		}
 		return ret;
+	}
+end:
+	// Skip spaces after value.
+	while (ret.jmp < conf.len && (conf.str[ret.jmp] == ' ')) {
+		ret.jmp++;
+	}
+	// If we got `#`, skip until newline or end of string, because it's a comment.
+	if (ret.jmp < conf.len && conf.str[ret.jmp] == '#') {
+		char *newline = memchr(conf.str, '\n', conf.len);
+		if (newline) {
+			ret.jmp = (size_t)(newline - conf.str);
+		} else {
+			ret.jmp = conf.len;
+		}
 	}
 	// Ensure the value is followed by a newline or end of string.
 	if (ret.jmp < conf.len && conf.str[ret.jmp] != '\n') {

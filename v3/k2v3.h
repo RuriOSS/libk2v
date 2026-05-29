@@ -27,13 +27,6 @@
  *
  *
  */
-
-/*
- * WARNING:
- * NO ANY FALLBACKS, JUST PANIC ON ANY ERROR.
- * USERS SHOULD BE RESPONSIBLE FOR THE INPUT.
- * SECURITY IS THE MOST IMPORTANT THING, SO WE DO NOT ALLOW ANY UNEXPECTED INPUTS.
- */
 #pragma once
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
@@ -76,7 +69,8 @@ struct K2V3_BUF {
 	struct K2V3_BUF *next;
 };
 typedef struct K2V3_BUF *k2v3_cache;
-
+extern bool k2v_stop_at_warning;
+extern bool k2v_show_warning;
 #define k2v3_error(...)                                                                             \
 	do {                                                                                        \
 		fprintf(stderr, "[libk2v]: in %s() at %s line %d :", __func__, __FILE__, __LINE__); \
@@ -84,11 +78,17 @@ typedef struct K2V3_BUF *k2v3_cache;
 		fprintf(stderr, "\n");                                                              \
 		exit(114);                                                                          \
 	} while (0)
-#define k2v3_warning(...)                                                                           \
-	do {                                                                                        \
-		fprintf(stderr, "[libk2v]: in %s() at %s line %d :", __func__, __FILE__, __LINE__); \
-		fprintf(stderr, __VA_ARGS__);                                                       \
-		fprintf(stderr, "\n");                                                              \
+#define k2v3_warning(...)                                                                                   \
+	do {                                                                                                \
+		if (k2v_show_warning || k2v_stop_at_warning) {                                              \
+			fprintf(stderr, "[libk2v]: in %s() at %s line %d :", __func__, __FILE__, __LINE__); \
+			fprintf(stderr, __VA_ARGS__);                                                       \
+			fprintf(stderr, "\n");                                                              \
+		}                                                                                           \
+		if (k2v_stop_at_warning) {                                                                  \
+			fprintf(stderr, "[libk2v]: k2v_stop_at_warning set, exit\n");                       \
+			exit(114);                                                                          \
+		}                                                                                           \
 	} while (0)
 k2v3_cache k2v3_parse(char *const _Nonnull buf);
 void k2v3_free_cache(k2v3_cache *cache);
