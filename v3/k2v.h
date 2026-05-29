@@ -59,33 +59,34 @@
 #define _Nonnull
 #endif
 // Version info.
-#define LIBK2V_MAJOR 3
-#define LIBK2V_MINOR 0
-enum K2V_TYPE {
-	K2V_SCALAR,
-	K2V_ARRAY,
+#define LIBK2V3_MAJOR 3
+#define LIBK2V3_MINOR 0
+enum K2V3_TYPE {
+	K2V3_SCALAR,
+	K2V3_ARRAY,
 };
-struct K2V_BUF {
-	enum K2V_TYPE type;
+struct K2V3_BUF {
+	enum K2V3_TYPE type;
 	char *key;
 	char *scalar_val;
 	size_t array_len;
 	char **array_val;
 	bool empty;
-	struct K2V_BUF *next;
+	struct K2V3_BUF *next;
 };
-typedef struct K2V_BUF *k2v_cache;
+typedef struct K2V3_BUF *k2v3_cache;
 
-#define k2v_error(...)                                                                              \
-	do {                                                                                        \
-		fprintf(stderr, "[libk2v]: in %s() at %s line %d :", __func__, __FILE__, __LINE__); \
-		fprintf(stderr, __VA_ARGS__);                                                       \
-		fprintf(stderr, "\n");                                                              \
-		exit(114);                                                                          \
+#define k2v3_error(...)                                                                              \
+	do {                                                                                         \
+		fprintf(stderr, "[libk2v3]: in %s() at %s line %d :", __func__, __FILE__, __LINE__); \
+		fprintf(stderr, __VA_ARGS__);                                                        \
+		fprintf(stderr, "\n");                                                               \
+		exit(114);                                                                           \
 	} while (0)
 
-k2v_cache k2v_parse(char *const _Nonnull buf);
-void k2v_free_cache(k2v_cache *cache);
-char *k2v_open_file(char *const _Nonnull path);
+k2v3_cache k2v3_parse(char *const _Nonnull buf);
+void k2v3_free_cache(k2v3_cache *cache);
+char *k2v3_open_file(char *const _Nonnull path);
 // For debugging.
-void k2v_dump(k2v_cache cache);
+void k2v3_dump(k2v3_cache cache);
+bool k2v3_have_key(k2v3_cache cache, char *const _Nonnull key);
