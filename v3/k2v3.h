@@ -90,6 +90,12 @@ extern bool k2v_show_warning;
 			exit(114);                                                                          \
 		}                                                                                           \
 	} while (0)
+#ifdef K2V3_FUZZ
+#undef k2v3_warning
+#define k2v3_warning(...) \
+	do {              \
+	} while (0)
+#endif
 k2v3_cache k2v3_parse(char *const _Nonnull buf);
 void k2v3_free_cache(k2v3_cache *cache);
 char *k2v3_open_file(char *const _Nonnull path);
