@@ -696,6 +696,9 @@ void k2v3_dump(k2v3_cache cache)
 }
 char *k2v3_open_file(char *const _Nonnull path)
 {
+	if (!path) {
+		return NULL;
+	}
 	int fd = open(path, O_RDONLY);
 	if (fd < 0) {
 		return NULL;
