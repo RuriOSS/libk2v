@@ -28,9 +28,42 @@
  *
  */
 #include "k2v3.h"
-bool k2v_stop_at_warning = false;
-bool k2v_show_warning = true;
-bool k2v3_warning_triggered = false;
+bool k2v3_stop_at_warning(int req)
+{
+	static thread_local bool ret = false;
+	if (req == -1) {
+		return ret;
+	}
+	if (req == 0) {
+		ret = false;
+	} else {
+		ret = true;
+	}
+	return ret;
+}
+bool k2v3_show_warning(int req)
+{
+	static thread_local bool ret = false;
+	if (req == -1) {
+		return ret;
+	}
+	if (req == 0) {
+		ret = false;
+	} else {
+		ret = true;
+	}
+	return ret;
+}
+enum K2V3_ERRNO k2v3_errno(enum K2V3_ERRNO req)
+{
+	static thread_local enum K2V3_ERRNO ret = K2V3_NORMAL;
+	if (req == K2V3_QUERY) {
+		return ret;
+	}
+	ret = req;
+	return ret;
+}
+thread_local jmp_buf k2v3_jmp;
 //
 //
 // Parse into cache.
@@ -476,6 +509,11 @@ end:
 k2v3_cache k2v3_parse(char *const _Nonnull buf)
 {
 	k2v3_cache ret = NULL;
+	if (setjmp(k2v3_jmp) != 0) {
+		// Free cache before returning NULL.
+		k2v3_free_cache(&ret);
+		return NULL;
+	}
 	struct K2V3_STRING conf = { .str = buf, .len = strlen(buf) };
 	while (conf.len > 0) {
 		// We do not allow leading spaces.

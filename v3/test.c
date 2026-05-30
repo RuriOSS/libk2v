@@ -2,8 +2,20 @@
 #include "../src/include/k2v.h"
 int main()
 {
+	k2v3_stop_at_warning(0);
 	char *buf = k2v3_open_file("test.conf");
 	k2v3_cache cache = k2v3_parse(buf);
+	switch (k2v3_errno(K2V3_QUERY)) {
+	case K2V3_UNRECOVERABLE:
+		printf("Unrecoverable error occurred during parsing.\n");
+		break;
+	case K2V3_RECOVERABLE:
+		printf("Recoverable error occurred during parsing.\n");
+		break;
+	default:
+		printf("No errors occurred during parsing.\n");
+		break;
+	}
 	k2v3_dump(cache);
 	printf("\n\n");
 	printf("bool_val: %s\n", k2v3_get_bool("bool_val", cache) ? "true" : "false");

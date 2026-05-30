@@ -37,13 +37,15 @@
 #include <string.h>
 #include <stdlib.h>
 #include <limits.h>
+#include <threads.h>
+#include <setjmp.h>
 #include <sys/stat.h>
 // Bool!!!
 #if __STDC_VERSION__ < 202000L
 #ifndef bool
 #define bool _Bool
-#define true ((_Bool) + 1u)
-#define false ((_Bool) + 0u)
+#define true ((_Bool)1u)
+#define false ((_Bool)0u)
 #endif
 #endif
 #ifndef _Nullable
@@ -69,25 +71,37 @@ struct K2V3_BUF {
 	struct K2V3_BUF *next;
 };
 typedef struct K2V3_BUF *k2v3_cache;
-extern bool k2v_stop_at_warning;
-extern bool k2v_show_warning;
-extern bool k2v3_warning_triggered;
+enum K2V3_ERRNO {
+	K2V3_QUERY,
+	K2V3_NORMAL,
+	K2V3_RECOVERABLE,
+	K2V3_UNRECOVERABLE,
+};
+bool k2v3_stop_at_warning(int req);
+bool k2v3_show_warning(int req);
+enum K2V3_ERRNO k2v3_errno(enum K2V3_ERRNO req);
+extern thread_local jmp_buf k2v3_jmp;
 #define k2v3_error(...)                                                                             \
 	do {                                                                                        \
+		k2v3_errno(K2V3_UNRECOVERABLE);                                                     \
 		fprintf(stderr, "[libk2v]: in %s() at %s line %d :", __func__, __FILE__, __LINE__); \
 		fprintf(stderr, __VA_ARGS__);                                                       \
 		fprintf(stderr, "\n");                                                              \
-		exit(114);                                                                          \
+		if (k2v3_stop_at_warning(-1)) {                                                     \
+			fprintf(stderr, "[libk2v]: k2v_stop_at_warning set, exit\n");               \
+			exit(114);                                                                  \
+		}                                                                                   \
+		longjmp(k2v3_jmp, 1);                                                               \
 	} while (0)
 #define k2v3_warning(...)                                                                                   \
 	do {                                                                                                \
-		k2v3_warning_triggered = true;                                                              \
-		if (k2v_show_warning || k2v_stop_at_warning) {                                              \
+		k2v3_errno(K2V3_RECOVERABLE);                                                               \
+		if (k2v3_show_warning(-1) || k2v3_stop_at_warning(-1)) {                                    \
 			fprintf(stderr, "[libk2v]: in %s() at %s line %d :", __func__, __FILE__, __LINE__); \
 			fprintf(stderr, __VA_ARGS__);                                                       \
 			fprintf(stderr, "\n");                                                              \
 		}                                                                                           \
-		if (k2v_stop_at_warning) {                                                                  \
+		if (k2v3_stop_at_warning(-1)) {                                                             \
 			fprintf(stderr, "[libk2v]: k2v_stop_at_warning set, exit\n");                       \
 			exit(114);                                                                          \
 		}                                                                                           \
