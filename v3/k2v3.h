@@ -77,9 +77,13 @@ enum K2V3_ERRNO {
 	K2V3_RECOVERABLE,
 	K2V3_UNRECOVERABLE,
 };
+// -1 for query, 0 for false, 1 for true.
 bool k2v3_stop_at_warning(int req);
+// -1 for query, 0 for false, 1 for true.
 bool k2v3_show_warning(int req);
+// Follow enum definitions in k2v3_errno.
 enum K2V3_ERRNO k2v3_errno(enum K2V3_ERRNO req);
+// Warning: when this happen, this lib has fully internal error and you should panic yourself.
 extern thread_local jmp_buf k2v3_jmp;
 #define k2v3_error(...)                                                                             \
 	do {                                                                                        \
@@ -135,9 +139,10 @@ char *char_to_k2v3(const char *_Nonnull key, const char *val);
 char *int_to_k2v3(const char *_Nonnull key, int val);
 char *bool_to_k2v3(const char *_Nonnull key, bool val);
 char *float_to_k2v3(const char *_Nonnull key, float val);
-char *long_to_k2v3(const char *_Nonnull key, long val);
+char *long_to_k2v3(const char *_Nonnull key, long long val);
 char *char_array_to_k2v3(const char *_Nonnull key, char *const *_Nonnull val, int len);
 char *int_array_to_k2v3(const char *_Nonnull key, int *_Nonnull val, int len);
 char *float_array_to_k2v3(const char *_Nonnull key, float *_Nonnull val, int len);
+char *long_array_to_k2v3(const char *_Nonnull key, long long *_Nonnull val, int len);
 char *k2v3_add_config_func(char *_Nullable buf, char *_Nonnull tmp);
 #define k2v3_add_config(type, __k2v3_buf, ...) k2v3_add_config_func(__k2v3_buf, type##_to_k2v3(__VA_ARGS__))

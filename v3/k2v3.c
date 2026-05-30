@@ -1053,7 +1053,7 @@ char *int_to_k2v3(const char *_Nonnull key, int val)
 	}
 	return ret;
 }
-char *long_to_k2v3(const char *_Nonnull key, long val)
+char *long_to_k2v3(const char *_Nonnull key, long long val)
 {
 	if (key == NULL) {
 		return NULL;
@@ -1061,7 +1061,7 @@ char *long_to_k2v3(const char *_Nonnull key, long val)
 	size_t max_len = strlen(key) + 64; // Safe upper bound for long
 	char *ret = malloc(max_len);
 	if (ret) {
-		snprintf(ret, max_len, "%s=\"%ld\"\n", key, val);
+		snprintf(ret, max_len, "%s=\"%lld\"\n", key, val);
 	}
 	return ret;
 }
@@ -1192,6 +1192,42 @@ char *float_array_to_k2v3(const char *_Nonnull key, float *_Nonnull val, int len
 
 	for (int i = 0; i < len; i++) {
 		ptr += sprintf(ptr, "\"%f\"", (double)val[i]);
+		if (i != len - 1) {
+			*ptr++ = ',';
+		}
+	}
+
+	*ptr++ = ']';
+	*ptr++ = '\n';
+	*ptr = '\0';
+
+	return buf;
+}
+char *long_array_to_k2v3(const char *_Nonnull key, long long *_Nonnull val, int len)
+{
+	if (key == NULL) {
+		return NULL;
+	}
+	if (len == 0 || val == NULL) {
+		size_t size = strlen(key) + 5;
+		char *ret = malloc(size);
+		if (ret) {
+			snprintf(ret, size, "%s=[]\n", key);
+		}
+		return ret;
+	}
+
+	size_t max_size = strlen(key) + ((size_t)len * 64) + 5; // 64 per long + padding
+	char *buf = malloc(max_size);
+	if (!buf) {
+		return NULL;
+	}
+
+	char *ptr = buf;
+	ptr += sprintf(ptr, "%s=[", key);
+
+	for (int i = 0; i < len; i++) {
+		ptr += sprintf(ptr, "\"%lld\"", val[i]);
 		if (i != len - 1) {
 			*ptr++ = ',';
 		}
