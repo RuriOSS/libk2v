@@ -28,6 +28,37 @@
  *
  */
 #include "include/k2v3.h"
+#define k2v3_error(...)                                                                             \
+	do {                                                                                        \
+		k2v3_errno(K2V3_UNRECOVERABLE);                                                     \
+		fprintf(stderr, "[libk2v]: in %s() at %s line %d :", __func__, __FILE__, __LINE__); \
+		fprintf(stderr, __VA_ARGS__);                                                       \
+		fprintf(stderr, "\n");                                                              \
+		if (k2v3_stop_at_warning(-1)) {                                                     \
+			fprintf(stderr, "[libk2v]: k2v_stop_at_warning set, exit\n");               \
+			exit(114);                                                                  \
+		}                                                                                   \
+		longjmp(k2v3_jmp, 1);                                                               \
+	} while (0)
+#define k2v3_warning(...)                                                                                   \
+	do {                                                                                                \
+		k2v3_errno(K2V3_RECOVERABLE);                                                               \
+		if (k2v3_show_warning(-1) || k2v3_stop_at_warning(-1)) {                                    \
+			fprintf(stderr, "[libk2v]: in %s() at %s line %d :", __func__, __FILE__, __LINE__); \
+			fprintf(stderr, __VA_ARGS__);                                                       \
+			fprintf(stderr, "\n");                                                              \
+		}                                                                                           \
+		if (k2v3_stop_at_warning(-1)) {                                                             \
+			fprintf(stderr, "[libk2v]: k2v_stop_at_warning set, exit\n");                       \
+			exit(114);                                                                          \
+		}                                                                                           \
+	} while (0)
+#ifdef K2V3_FUZZ
+#undef k2v3_warning
+#define k2v3_warning(...) \
+	do {              \
+	} while (0)
+#endif
 bool k2v3_stop_at_warning(int req)
 {
 	static thread_local bool ret = false;
@@ -63,6 +94,7 @@ enum K2V3_ERRNO k2v3_errno(enum K2V3_ERRNO req)
 	ret = req;
 	return ret;
 }
+// Warning: when this happen, this lib has fully internal error and you should panic yourself.
 thread_local jmp_buf k2v3_jmp;
 //
 //
