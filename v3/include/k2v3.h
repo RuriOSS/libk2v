@@ -60,6 +60,7 @@
 enum K2V3_TYPE {
 	K2V3_SCALAR,
 	K2V3_ARRAY,
+	K2V3_ANY,
 };
 struct K2V3_BUF {
 	enum K2V3_TYPE type;
@@ -118,8 +119,8 @@ extern thread_local jmp_buf k2v3_jmp;
 #endif
 k2v3_cache k2v3_parse(char *const _Nonnull buf);
 void k2v3_free_cache(k2v3_cache *cache);
-char *k2v3_open_file(char *const _Nonnull path);
-int k2v3_have_key(k2v3_cache cache, char *const _Nonnull key, enum K2V3_TYPE type);
+char *k2v3_open_file(const char *_Nonnull path, off_t limit);
+int k2v3_have_key(k2v3_cache cache, const char *_Nonnull key, enum K2V3_TYPE type);
 char *k2v3_get_char(const char *_Nonnull key, k2v3_cache cache);
 int k2v3_get_int(const char *_Nonnull key, k2v3_cache cache);
 float k2v3_get_float(const char *_Nonnull key, k2v3_cache cache);

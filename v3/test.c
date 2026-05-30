@@ -3,7 +3,7 @@
 int main(int __attribute((unused)) argc, char *argv[])
 {
 	k2v3_stop_at_warning(0);
-	char *buf = k2v3_open_file(argv[1]);
+	char *buf = k2v3_open_file(argv[1], 65536);
 	if (!buf) {
 		printf("Failed to open file: %s\n", argv[1]);
 		return 1;

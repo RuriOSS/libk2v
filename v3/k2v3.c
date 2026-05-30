@@ -317,7 +317,7 @@ static struct K2V3_VALUE get_value(struct K2V3_STRING conf)
 				for (size_t i = 0; i < array_len; i++) {
 					free(array_val[i]);
 				}
-				free(array_val);
+				free((void *)array_val);
 				ret.type = K2V3_SCALAR;
 				ret.empty = true;
 				// Goto next line or end of string.
@@ -346,7 +346,7 @@ static struct K2V3_VALUE get_value(struct K2V3_STRING conf)
 					for (size_t i = 0; i < array_len; i++) {
 						free(array_val[i]);
 					}
-					free(array_val);
+					free((void *)array_val);
 					ret.type = K2V3_SCALAR;
 					ret.empty = true;
 					// Goto next line or end of string.
@@ -367,7 +367,7 @@ static struct K2V3_VALUE get_value(struct K2V3_STRING conf)
 				for (size_t i = 0; i < array_len; i++) {
 					free(array_val[i]);
 				}
-				free(array_val);
+				free((void *)array_val);
 				ret.type = K2V3_SCALAR;
 				ret.empty = true;
 				// Goto next line or end of string.
@@ -395,7 +395,7 @@ static struct K2V3_VALUE get_value(struct K2V3_STRING conf)
 				return ret;
 			}
 			// Add to array.
-			char **new_array_val = realloc(array_val, sizeof(char *) * (array_len + 1));
+			char **new_array_val = (char **)realloc((void *)array_val, sizeof(char *) * (array_len + 1));
 			if (!new_array_val) {
 				free(element);
 				k2v3_error("Failed to allocate memory for array. This is an internal error.");
@@ -423,7 +423,7 @@ static struct K2V3_VALUE get_value(struct K2V3_STRING conf)
 					for (size_t i = 0; i < array_len; i++) {
 						free(array_val[i]);
 					}
-					free(array_val);
+					free((void *)array_val);
 					// Goto next line or end of string.
 					ret.jmp = i + 1;
 					goto end;
@@ -437,7 +437,7 @@ static struct K2V3_VALUE get_value(struct K2V3_STRING conf)
 					for (size_t i = 0; i < array_len; i++) {
 						free(array_val[i]);
 					}
-					free(array_val);
+					free((void *)array_val);
 					// Goto next line or end of string.
 					char *newline = memchr(conf.str, '\n', conf.len);
 					if (newline) {
@@ -489,9 +489,9 @@ end:
 			for (size_t i = 0; i < ret.array_len; i++) {
 				free(ret.array_val[i]);
 			}
-			free(ret.array_val);
+			free((void *)ret.array_val);
 		} else {
-			free(ret.scalar_val);
+			free((void *)ret.scalar_val);
 		}
 		ret.type = K2V3_SCALAR;
 		ret.empty = true;
@@ -542,92 +542,91 @@ k2v3_cache k2v3_parse(char *const _Nonnull buf)
 			conf.str = newline + 1;
 			conf.len = strlen(conf.str);
 			continue;
+		}
+		// Get key.
+		struct K2V3_KEY key = get_key(conf);
+		if (!key.key) {
+			k2v3_warning("Failed to parse key.");
+			// Goto next line.
+			char *newline = memchr(conf.str, '\n', conf.len);
+			if (!newline) {
+				break;
+			}
+			conf.str = newline + 1;
+			conf.len = strlen(conf.str);
+			continue;
+		}
+		conf.str += key.jmp;
+		conf.len -= key.jmp;
+		if (conf.len == 0) {
+			free(key.key);
+			return ret;
+		}
+		// Get value.
+		struct K2V3_VALUE value = get_value(conf);
+		if (!value.scalar_val && !value.array_val && !value.empty) {
+			printf("Debug info: conf.str:\n%s\n", conf.str);
+			k2v3_error("Failed to parse value. This is an internal error.");
+		}
+		conf.str += value.jmp;
+		conf.len -= value.jmp;
+		// Add to cache.
+		k2v3_cache node = malloc(sizeof(struct K2V3_BUF));
+		if (!node) {
+			k2v3_error("Failed to allocate cache node. This is an internal error.");
+		}
+		*node = (struct K2V3_BUF){ .type = value.type, .key = key.key, .next = NULL };
+		if (value.empty) {
+			node->empty = true;
 		} else {
-			// Get key.
-			struct K2V3_KEY key = get_key(conf);
-			if (!key.key) {
-				k2v3_warning("Failed to parse key.");
-				// Goto next line.
-				char *newline = memchr(conf.str, '\n', conf.len);
-				if (!newline) {
+			node->empty = false;
+			if (value.type == K2V3_ARRAY) {
+				node->array_len = value.array_len;
+				node->array_val = value.array_val;
+			} else {
+				node->scalar_val = value.scalar_val;
+			}
+		}
+		// Append to the cache.
+		if (ret == NULL) {
+			ret = node;
+		} else {
+			k2v3_cache cur = ret;
+			while (cur->next != NULL) {
+				// Also check for duplicate keys.
+				if (strcmp(cur->key, key.key) == 0) {
+					k2v3_warning("Duplicate keys are not allowed.");
+					if (node->type == K2V3_ARRAY) {
+						for (size_t i = 0; i < node->array_len; i++) {
+							free(node->array_val[i]);
+						}
+						free((void *)node->array_val);
+					} else {
+						free((void *)node->scalar_val);
+					}
+					free(node);
+					free(key.key);
+					node = NULL;
 					break;
 				}
-				conf.str = newline + 1;
-				conf.len = strlen(conf.str);
-				continue;
+				cur = cur->next;
 			}
-			conf.str += key.jmp;
-			conf.len -= key.jmp;
-			if (conf.len == 0) {
-				free(key.key);
-				return ret;
-			}
-			// Get value.
-			struct K2V3_VALUE value = get_value(conf);
-			if (!value.scalar_val && !value.array_val && !value.empty) {
-				printf("Debug info: conf.str:\n%s\n", conf.str);
-				k2v3_error("Failed to parse value. This is an internal error.");
-			}
-			conf.str += value.jmp;
-			conf.len -= value.jmp;
-			// Add to cache.
-			k2v3_cache node = malloc(sizeof(struct K2V3_BUF));
-			if (!node) {
-				k2v3_error("Failed to allocate cache node. This is an internal error.");
-			}
-			*node = (struct K2V3_BUF){ .type = value.type, .key = key.key, .next = NULL };
-			if (value.empty) {
-				node->empty = true;
-			} else {
-				node->empty = false;
-				if (value.type == K2V3_ARRAY) {
-					node->array_len = value.array_len;
-					node->array_val = value.array_val;
-				} else {
-					node->scalar_val = value.scalar_val;
-				}
-			}
-			// Append to the cache.
-			if (ret == NULL) {
-				ret = node;
-			} else {
-				k2v3_cache cur = ret;
-				while (cur->next != NULL) {
-					// Also check for duplicate keys.
-					if (strcmp(cur->key, key.key) == 0) {
-						k2v3_warning("Duplicate keys are not allowed.");
-						if (node->type == K2V3_ARRAY) {
-							for (size_t i = 0; i < node->array_len; i++) {
-								free(node->array_val[i]);
-							}
-							free(node->array_val);
-						} else {
-							free(node->scalar_val);
+			if (node) {
+				if (strcmp(cur->key, key.key) == 0) {
+					k2v3_warning("Duplicate keys are not allowed.");
+					if (node->type == K2V3_ARRAY) {
+						for (size_t i = 0; i < node->array_len; i++) {
+							free(node->array_val[i]);
 						}
-						free(node);
-						free(key.key);
-						node = NULL;
-						break;
+						free((void *)node->array_val);
+					} else {
+						free((void *)node->scalar_val);
 					}
-					cur = cur->next;
+					free(node);
+					free(key.key);
+					node = NULL;
 				}
-				if (node) {
-					if (strcmp(cur->key, key.key) == 0) {
-						k2v3_warning("Duplicate keys are not allowed.");
-						if (node->type == K2V3_ARRAY) {
-							for (size_t i = 0; i < node->array_len; i++) {
-								free(node->array_val[i]);
-							}
-							free(node->array_val);
-						} else {
-							free(node->scalar_val);
-						}
-						free(node);
-						free(key.key);
-						node = NULL;
-					}
-					cur->next = node;
-				}
+				cur->next = node;
 			}
 		}
 	}
@@ -661,7 +660,7 @@ void k2v3_free_cache(k2v3_cache *cache)
 			for (size_t i = 0; i < cur->array_len; i++) {
 				free(cur->array_val[i]);
 			}
-			free(cur->array_val);
+			free((void *)cur->array_val);
 		} else {
 			free(cur->scalar_val);
 		}
@@ -694,12 +693,12 @@ void k2v3_dump(k2v3_cache cache)
 		cache = cache->next;
 	}
 }
-char *k2v3_open_file(char *const _Nonnull path)
+char *k2v3_open_file(const char *_Nonnull path, off_t limit)
 {
 	if (!path) {
 		return NULL;
 	}
-	int fd = open(path, O_RDONLY);
+	int fd = open(path, O_RDONLY | O_CLOEXEC);
 	if (fd < 0) {
 		return NULL;
 	}
@@ -712,9 +711,9 @@ char *k2v3_open_file(char *const _Nonnull path)
 		close(fd);
 		return NULL;
 	}
-	if (st.st_size > 128 * 1024) {
+	if (st.st_size > limit) {
 		close(fd);
-		k2v3_warning("File size exceeds 128KB, which is the maximum supported size. This file will be ignored.");
+		k2v3_warning("File size exceeds the specified limit. This file will be ignored.");
 		return NULL;
 	}
 	char *buf = malloc((size_t)st.st_size + 1);
@@ -732,21 +731,32 @@ char *k2v3_open_file(char *const _Nonnull path)
 	close(fd);
 	return buf;
 }
-int k2v3_have_key(k2v3_cache cache, char *const _Nonnull key, enum K2V3_TYPE type)
+int k2v3_have_key(k2v3_cache cache, const char *const _Nonnull key, enum K2V3_TYPE type)
 {
 	/*
 	 * 0 for key exists with the expected type.
 	 * 1 for key exists but with different type.
 	 * -1 for key does not exist.
 	 */
+	if (type == K2V3_ANY) {
+		while (cache != NULL) {
+			if (strcmp(cache->key, key) == 0) {
+				return 0;
+			}
+			cache = cache->next;
+		}
+		return -1;
+	}
 	while (cache != NULL) {
 		if (strcmp(cache->key, key) == 0 && cache->type == type) {
 			return 0;
-		} else if (strcmp(cache->key, key) == 0 && cache->type != type) {
+		}
+		if (strcmp(cache->key, key) == 0 && cache->type != type) {
 			return 1;
 		}
 		cache = cache->next;
 	}
+
 	return -1;
 }
 
@@ -791,7 +801,7 @@ int k2v3_get_int(const char *_Nonnull key, k2v3_cache cache)
 	if (node->empty) {
 		return 0;
 	}
-	char *endptr;
+	char *endptr = NULL;
 	long ret = strtol(node->scalar_val, &endptr, 10);
 	if (*endptr != '\0') {
 		return 0;
@@ -812,7 +822,7 @@ float k2v3_get_float(const char *_Nonnull key, k2v3_cache cache)
 	if (node->empty) {
 		return 0;
 	}
-	char *endptr;
+	char *endptr = NULL;
 	float val = strtof(node->scalar_val, &endptr);
 	if (*endptr != '\0') {
 		k2v3_warning("Value for key '%s' is not a valid float.", key);
@@ -833,12 +843,12 @@ bool k2v3_get_bool(const char *_Nonnull key, k2v3_cache cache)
 	}
 	if (strcmp(node->scalar_val, "true") == 0) {
 		return true;
-	} else if (strcmp(node->scalar_val, "false") == 0) {
-		return false;
-	} else {
-		k2v3_warning("Value for key '%s' is not a valid boolean. Expected 'true' or 'false' but got '%s'.", key, node->scalar_val);
+	}
+	if (strcmp(node->scalar_val, "false") == 0) {
 		return false;
 	}
+	k2v3_warning("Value for key '%s' is not a valid boolean. Expected 'true' or 'false' but got '%s'.", key, node->scalar_val);
+	return false;
 }
 long long k2v3_get_long(const char *_Nonnull key, k2v3_cache cache)
 {
@@ -850,7 +860,7 @@ long long k2v3_get_long(const char *_Nonnull key, k2v3_cache cache)
 	if (node->empty) {
 		return 0;
 	}
-	char *endptr;
+	char *endptr = NULL;
 	long long ret = strtoll(node->scalar_val, &endptr, 10);
 	if (*endptr != '\0') {
 		k2v3_warning("Value for key '%s' is not a valid long integer.", key);
@@ -874,17 +884,15 @@ int k2v3_get_int_array(const char *_Nonnull key, k2v3_cache cache, int *_Nonnull
 	}
 	int count = 0;
 	for (size_t i = 0; i < node->array_len; i++) {
-		char *endptr;
+		char *endptr = NULL;
 		long val = strtol(node->array_val[i], &endptr, 10);
 		if (*endptr != '\0') {
 			k2v3_warning("Value '%s' in array for key '%s' is not a valid integer.", node->array_val[i], key);
 			val = 0;
-			continue;
 		}
 		if (val > INT_MAX || val < INT_MIN) {
 			k2v3_warning("Value '%s' in array for key '%s' is too large for int.", node->array_val[i], key);
 			val = 0;
-			continue;
 		}
 		array[count++] = (int)val;
 	}
@@ -926,7 +934,7 @@ int k2v3_get_float_array(const char *_Nonnull key, k2v3_cache cache, float *_Non
 	}
 	int count = 0;
 	for (size_t i = 0; i < node->array_len; i++) {
-		char *endptr;
+		char *endptr = NULL;
 		float val = strtof(node->array_val[i], &endptr);
 		if (*endptr != '\0') {
 			k2v3_warning("Value '%s' in array for key '%s' is not a valid float.", node->array_val[i], key);
@@ -952,7 +960,7 @@ int k2v3_get_long_array(const char *_Nonnull key, k2v3_cache cache, long long *_
 	}
 	int count = 0;
 	for (size_t i = 0; i < node->array_len; i++) {
-		char *endptr;
+		char *endptr = NULL;
 		long long val = strtoll(node->array_val[i], &endptr, 10);
 		if (*endptr != '\0') {
 			k2v3_warning("Value '%s' in array for key '%s' is not a valid long integer.", node->array_val[i], key);
